@@ -90,12 +90,17 @@ templates.env.filters["cnpj"] = _formatar_cnpj
 
 
 def _pagina(request: Request, template: str, **contexto) -> HTMLResponse:
-    """Renderiza um template já com o que toda tela precisa."""
+    """Renderiza um template já com o que toda tela precisa.
+
+    A ordem dos argumentos (request primeiro) é a exigida pelas versões novas
+    do Starlette. A forma antiga ainda funciona, mas dá aviso de descontinuada
+    e um dia deixa de existir.
+    """
     contexto.setdefault("request", request)
     contexto.setdefault("mensagem", request.query_params.get("msg"))
     contexto.setdefault("tipo_mensagem", request.query_params.get("tipo", "sucesso"))
     contexto.setdefault("rodada_ativa", servico_emissao.rodada_em_andamento())
-    return templates.TemplateResponse(template, contexto)
+    return templates.TemplateResponse(request, template, contexto)
 
 
 def _redirecionar(destino: str, msg: str | None = None, tipo: str = "sucesso"):
@@ -633,10 +638,10 @@ def pagina_erro(
     request: Request, codigo: int, resumo: str, detalhe: str, emoji: str = "⚠️"
 ) -> HTMLResponse:
     """Erro em português e com caminho de volta, em vez de JSON cru."""
-    resposta = templates.TemplateResponse(
+    return templates.TemplateResponse(
+        request,
         "erro.html",
         {
-            "request": request,
             "titulo": f"Erro {codigo}",
             "resumo": resumo,
             "detalhe": detalhe,
@@ -645,4 +650,3 @@ def pagina_erro(
         },
         status_code=codigo,
     )
-    return resposta

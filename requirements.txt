@@ -1,14 +1,33 @@
 # Dependências do Sistema de CNDs
 # Instale com:  pip install -r requirements.txt
+#
+# POR QUE AQUI TEM ">=" E NÃO "==":
+# Versões travadas com "==" só funcionam nas versões de Python que existiam
+# quando elas foram publicadas. Em um Python mais novo, o pip não acha o
+# pacote pronto, tenta compilar do zero e pede o compilador da Microsoft —
+# que ninguém tem instalado numa máquina comum.
+# Com ">=" o pip escolhe sozinho a versão mais nova compatível com o Python
+# que estiver na máquina. O "<" seguinte trava só a virada de versão
+# principal, que é quando as bibliotecas costumam quebrar compatibilidade.
+#
+# Testado em Python 3.11, 3.12, 3.13 e 3.14.
 
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-jinja2==3.1.5
-python-multipart==0.0.20
-sqlalchemy==2.0.36
-pyyaml==6.0.2
-apscheduler==3.11.0
-playwright==1.49.1
-httpx==0.28.1
-pdfplumber==0.11.4
-openpyxl==3.1.5
+fastapi>=0.115.6,<1
+uvicorn[standard]>=0.34.0,<1
+jinja2>=3.1.5,<4
+python-multipart>=0.0.20,<1
+sqlalchemy>=2.0.36,<3
+
+# PyYAML só ganhou pacote pronto para Python 3.14 na versão 6.0.3.
+pyyaml>=6.0.3,<7
+
+apscheduler>=3.11.0,<4
+
+# O playwright é quem manda na versão do greenlet. Até a 1.54 ele travava em
+# greenlet==3.1.1, que não tem pacote pronto para o Python 3.14. Da 1.55 em
+# diante ele aceita greenlet<4, e aí o pip pega o 3.5.x, que tem.
+playwright>=1.55.0,<2
+
+httpx>=0.28.1,<1
+pdfplumber>=0.11.4,<1
+openpyxl>=3.1.5,<4

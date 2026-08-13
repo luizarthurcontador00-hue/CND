@@ -86,12 +86,25 @@ if not exist "%VPY%" (
 if not exist ".venv\.instalado" (
     echo [2/3] Instalando as bibliotecas necessarias...
     "%VPY%" -m pip install --upgrade pip >> "%LOG%" 2>&1
-    "%VPY%" -m pip install -r requirements.txt >> "%LOG%" 2>&1
+    "%VPY%" -m pip install --prefer-binary -r requirements.txt >> "%LOG%" 2>&1
     if errorlevel 1 (
         echo.
         echo [ERRO] Falha ao instalar as bibliotecas.
-        echo Verifique se este computador tem acesso a internet.
-        echo O detalhe do erro esta em ultima_execucao.log
+        echo.
+        echo Duas causas possiveis:
+        echo.
+        echo  1^) Sem acesso a internet neste computador.
+        echo.
+        echo  2^) Seu Python e MUITO novo e alguma biblioteca ainda nao tem
+        echo     pacote pronto para ele. O sinal disso e a frase
+        echo     "Microsoft Visual C++ 14.0 or greater is required"
+        echo     dentro do ultima_execucao.log.
+        echo     Nesse caso, o caminho mais simples e instalar o Python 3.12
+        echo     ou 3.13 em https://www.python.org/downloads/
+        echo     ^(NAO precisa desinstalar o que voce ja tem^), apagar a pasta
+        echo     .venv e clicar neste arquivo de novo.
+        echo.
+        echo O detalhe completo do erro esta em ultima_execucao.log
         goto :fim
     )
 
