@@ -191,6 +191,13 @@ certidoes:
     # certidão nova (caso da "positiva com efeitos de negativa").
     url_consultar: "https://servicos.receitafederal.gov.br/servico/certidoes/#/consultar"
 
+    # Igual ao FGTS: com o navegador VISÍVEL (navegador.headless: false), o robô
+    # abre a tela com o CNPJ já preenchido e espera este tanto de segundos para
+    # você clicar no "não sou um robô". Depois disso ele continua sozinho —
+    # baixa o PDF, lê a validade e guarda tudo. É o jeito de usar a Federal
+    # sem contratar serviço de captcha.
+    segundos_para_resolver: 180
+
   CNDT:
     nome: "Trabalhista — CNDT / TST"
     ativo: true

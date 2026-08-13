@@ -371,15 +371,20 @@ Sem o `#`, a página abre em branco. Os dois endereços que o robô usa (emissã
 lugar outra vez, abra o site no navegador, copie o endereço da barra e cole
 lá — sem esperar por uma versão nova do sistema.
 
-**O portal usa hCaptcha**, o mesmo tipo da Caixa. Não existe jeito de resolver
-isso na própria máquina. Você tem duas saídas, e a primeira é a recomendada:
+**O portal usa hCaptcha**, o mesmo tipo da Caixa. Você tem três saídas, e a
+primeira é a recomendada porque não custa nada:
 
-1. **Emitir à mão e anexar** (sem custo). Emita a certidão no portal e anexe o
-   PDF em Histórico → "Anexar PDF emitido à mão". Como a Federal vale 180 dias,
-   isso dá umas duas vezes por ano por empresa.
-2. **Contratar um serviço de captcha.** Preencha `captcha.provedor` e
-   `captcha.chave_api` no `config.yaml` e o robô passa a emitir sozinho.
-   Custa poucos centavos por certidão.
+1. **Modo assistido — igual ao que fez o FGTS funcionar.** No `config.yaml`,
+   mude `navegador.headless` para `false`. O robô abre a janela do navegador
+   com o CNPJ **já preenchido** e espera até 3 minutos você clicar no
+   "não sou um robô". A partir daí ele continua sozinho: baixa o PDF, lê a
+   validade e guarda tudo no lugar certo. Você só clica no quadradinho.
+2. **Emitir à mão e anexar.** Emita no portal e anexe o PDF em
+   Histórico → "Anexar PDF emitido à mão". Como a Federal vale 180 dias, isso
+   dá umas duas vezes por ano por empresa.
+3. **Contratar um serviço de captcha.** Preencha `captcha.provedor` e
+   `captcha.chave_api` no `config.yaml` e o robô emite sem você. Custa poucos
+   centavos por certidão.
 
 **A regra da 2ª via está implementada.** Quando a empresa tem "positiva com
 efeitos de negativa", o portal não emite certidão nova. Lendo o próprio código

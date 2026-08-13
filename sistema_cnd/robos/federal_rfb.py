@@ -232,14 +232,69 @@ def _tem_hcaptcha(pagina) -> bool:
         return False
 
 
-def _responder_hcaptcha(pagina, contexto: dict) -> bool:
-    """Tenta resolver o hCaptcha usando o serviço pago, se houver.
+def _hcaptcha_resolvido(pagina) -> bool:
+    """True quando o campo escondido do hCaptcha já tem resposta."""
+    try:
+        return bool(
+            pagina.evaluate(
+                """() => {
+                    const c = document.querySelector('[name="h-captcha-response"]')
+                          || document.querySelector('[name="g-recaptcha-response"]');
+                    return c && c.value && c.value.length > 20;
+                }"""
+            )
+        )
+    except Exception:
+        return False
 
-    Devolve True quando o token foi injetado na página. Sem serviço configurado
-    devolve False — e o robô então registra CAPTCHA_FALHOU, sem travar nada.
+
+def _esperar_usuario_resolver(pagina, segundos: int) -> bool:
+    """Deixa a pessoa clicar no "não sou um robô" na janela do navegador.
+
+    É o mesmo recurso que faz o FGTS funcionar sem serviço pago: em vez de
+    desistir, o robô abre a tela, preenche o que sabe preencher e espera a
+    pessoa resolver só o desafio. Só faz sentido com o navegador visível
+    (config.yaml -> navegador.headless: false).
+    """
+    logger.info(
+        "[FEDERAL] Resolva o \"não sou um robô\" na janela do navegador. "
+        "Aguardando até %d segundos.",
+        segundos,
+    )
+    try:
+        pagina.wait_for_function(
+            """() => {
+                const c = document.querySelector('[name="h-captcha-response"]')
+                      || document.querySelector('[name="g-recaptcha-response"]');
+                return c && c.value && c.value.length > 20;
+            }""",
+            timeout=segundos * 1000,
+        )
+        logger.info("[FEDERAL] Desafio resolvido na tela. Seguindo com a emissão.")
+        return True
+    except Exception:
+        logger.info("[FEDERAL] O desafio não foi resolvido dentro do tempo.")
+        return False
+
+
+def _responder_hcaptcha(pagina, contexto: dict) -> bool:
+    """Consegue passar pelo hCaptcha? Tenta, nesta ordem:
+
+    1. serviço pago, se estiver configurado no config.yaml;
+    2. a própria pessoa, quando o navegador está visível;
+    3. desiste — e aí o robô registra CAPTCHA_FALHOU, sem travar nada.
     """
     cfg = contexto.get("config")
+    regras = contexto.get("regras") or {}
+
+    if _hcaptcha_resolvido(pagina):
+        return True
+
     if cfg is None or not cfg.captcha_disponivel:
+        # Sem serviço pago: se a janela está aberta, a pessoa resolve.
+        if not contexto.get("headless", True):
+            segundos = int(regras.get("segundos_para_resolver", 180))
+            return _esperar_usuario_resolver(pagina, segundos)
         return False
 
     sitekey = _sitekey_hcaptcha(pagina)
@@ -250,6 +305,10 @@ def _responder_hcaptcha(pagina, contexto: dict) -> bool:
     logger.info("[FEDERAL] Pedindo a resolução do hCaptcha ao serviço configurado…")
     token = resolver_hcaptcha(sitekey, pagina.url, cfg)
     if not token:
+        # O serviço falhou, mas se a janela está aberta a pessoa ainda resolve.
+        if not contexto.get("headless", True):
+            segundos = int(regras.get("segundos_para_resolver", 180))
+            return _esperar_usuario_resolver(pagina, segundos)
         return False
 
     # O widget guarda a resposta em textareas escondidas; preencher as duas é o
@@ -278,13 +337,31 @@ def _mensagem_captcha(contexto: dict) -> str:
             "da Receita desta vez. Tente de novo mais tarde ou emita a certidão à mão e "
             "anexe o PDF pela tela de Histórico."
         )
+    if contexto.get("headless", True):
+        return (
+            "O portal da Receita exige o \"não sou um robô\" (hCaptcha), e o navegador "
+            "está em modo invisível, então não há como respondê-lo. O jeito mais simples, "
+            "sem custo: abra o config.yaml, mude navegador.headless para false e rode a "
+            "consulta da Federal de novo — a janela do navegador vai abrir com o CNPJ já "
+            "preenchido e você só clica no quadradinho. O robô continua sozinho a partir "
+            "daí. Se preferir, emita à mão e anexe o PDF pela tela de Histórico."
+        )
     return (
-        "O portal da Receita Federal exige hCaptcha (o \"não sou um robô\"), que não tem "
-        "como ser resolvido na própria máquina. Duas saídas: emitir a certidão à mão no "
-        "site e anexar o PDF pela tela de Histórico (é o caminho recomendado, sem custo), "
-        "ou contratar um serviço de captcha e preencher captcha.provedor e captcha.chave_api "
-        "no config.yaml para automatizar."
+        "O \"não sou um robô\" do portal da Receita não foi resolvido a tempo na janela "
+        "do navegador. Rode de novo e clique no quadradinho quando a janela abrir, ou "
+        "emita a certidão à mão e anexe o PDF pela tela de Histórico."
     )
+
+
+def _guardar_sessao(pagina, arquivo: Path | None) -> None:
+    """Guarda os cookies para as próximas emissões começarem adiantadas."""
+    if not arquivo:
+        return
+    try:
+        arquivo.parent.mkdir(parents=True, exist_ok=True)
+        pagina.context.storage_state(path=str(arquivo))
+    except Exception as e:
+        logger.debug("Não consegui guardar a sessão da Receita: %s", e)
 
 
 def _arquivo_sessao(contexto: dict) -> Path | None:
@@ -322,6 +399,8 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
             pagina, numero, contexto, regras, pasta_debug, url_emitir
         )
         if resultado is not None:
+            if resultado.sucesso:
+                _guardar_sessao(pagina, sessao)
             return resultado
 
         # ------------------------------------- 2) regra especial da 2ª via
