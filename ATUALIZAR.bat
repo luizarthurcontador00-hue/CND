@@ -1,5 +1,6 @@
 @echo off
-chcp 65001 >nul
+setlocal
+chcp 65001 >nul 2>&1
 title Sistema de CNDs - Atualizar bibliotecas
 cd /d "%~dp0"
 
@@ -16,24 +17,27 @@ echo.
 pause
 
 if not exist ".venv\Scripts\python.exe" (
-    echo Ambiente ainda nao existe. Rode o INICIAR.bat primeiro.
+    echo.
+    echo O ambiente ainda nao existe. Rode o INICIAR.bat primeiro.
+    echo.
     pause
     exit /b 1
 )
 
-call ".venv\Scripts\activate.bat"
+set "VPY=%~dp0.venv\Scripts\python.exe"
 
 echo.
 echo Atualizando bibliotecas...
-python -m pip install --upgrade pip --quiet
-python -m pip install -r requirements.txt --upgrade
+"%VPY%" -m pip install --upgrade pip
+"%VPY%" -m pip install -r requirements.txt --upgrade
 
 echo.
 echo Atualizando o navegador dos robos...
-python -m playwright install chromium
+"%VPY%" -m playwright install chromium
 
 echo.
 echo ==================================================================
 echo   Pronto. Pode fechar esta janela e abrir o INICIAR.bat.
 echo ==================================================================
 pause
+endlocal

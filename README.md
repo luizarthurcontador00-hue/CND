@@ -22,9 +22,17 @@ certidões.
 4. Clique em **"Install Now"** e espere terminar.
 5. Reinicie o computador.
 
-### Passo 2 — Colocar a pasta do sistema no lugar
+### Passo 2 — Extrair e colocar a pasta no lugar
 
-Copie a pasta inteira do sistema para um lugar fixo, por exemplo:
+> ⚠️ **O erro mais comum está aqui.** Se você baixou um arquivo `.zip`, é
+> preciso **EXTRAIR** antes de usar. Clicar no `INICIAR.bat` de dentro do ZIP
+> **não funciona** — o Windows abre só aquele arquivo, sem o resto do sistema
+> junto, e a janela fecha na hora.
+>
+> Como extrair: clique com o **botão direito** no arquivo `.zip` →
+> **"Extrair tudo…"** → escolha a pasta → **Extrair**.
+
+Depois de extrair, mova a pasta para um lugar fixo, por exemplo:
 
 ```
 C:\SistemaCND\
@@ -32,6 +40,15 @@ C:\SistemaCND\
 
 Evite deixar dentro de "Downloads" ou na Área de Trabalho — a pasta vai crescer
 com o tempo (os PDFs ficam dentro dela, a menos que você aponte para outro lugar).
+
+A pasta certa é a que tem estes itens **lado a lado**:
+
+```
+INICIAR.bat
+DIAGNOSTICO.bat
+requirements.txt
+sistema_cnd\        <- com o main.py dentro
+```
 
 ### Passo 3 — Primeira execução
 
@@ -203,8 +220,48 @@ no máximo 3 tentativas por certidão.
 
 ## 8. Problemas comuns
 
+### 🔴 "Cliquei no INICIAR.bat e não aconteceu nada"
+
+Faça nesta ordem:
+
+1. **Confirme que o ZIP foi extraído.** Clicar no `.bat` de dentro do ZIP não
+   funciona. Veja o Passo 2 acima.
+2. **Rode o `DIAGNOSTICO.bat`** (duplo clique). Ele não altera nada: só junta
+   as informações num arquivo `diagnostico.txt`, abre no Bloco de Notas e me
+   mostra o que está faltando. Me mande esse texto.
+3. **Se quiser ver o erro com seus olhos:** abra o Menu Iniciar, digite `cmd`,
+   e na janela preta digite (trocando a pasta pela sua):
+
+   ```
+   cd C:\SistemaCND
+   INICIAR.bat
+   ```
+
+   Assim a janela **não fecha** e a mensagem de erro fica visível.
+
+Depois de rodar uma vez, o arquivo `ultima_execucao.log` guarda o motivo da
+falha. Ele também serve para me mandar.
+
+### Se nada disso resolver — instalação na mão
+
+São três comandos na janela preta (`cmd`), um de cada vez:
+
+```
+cd C:\SistemaCND
+py -3 -m venv .venv
+.venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m playwright install chromium
+cd sistema_cnd
+..\.venv\Scripts\python main.py
+```
+
+Se o `py -3` não funcionar, troque por `python`.
+
+### Outros problemas
+
 | Sintoma | O que fazer |
 |---|---|
+| A janela abre e fecha num piscar | Quase sempre é o ZIP não extraído. Veja o item vermelho acima. |
 | "O Python não foi encontrado" | Reinstale o Python marcando **"Add python.exe to PATH"**. |
 | "A porta 8000 já está em uso" | O sistema provavelmente já está aberto — tente `http://localhost:8000`. Se não for isso, mude `servidor.porta` para 8001. |
 | A janela preta abre e fecha na hora | Abra o `INICIAR.bat` e leia a mensagem antes de fechar; ou abra o arquivo `sistema_cnd/logs/sistema.log`. |
@@ -219,6 +276,9 @@ essa tela responde a maior parte das perguntas.
 ## 9. Como o sistema é organizado (referência técnica)
 
 ```
+INICIAR.bat              abre o sistema (duplo clique)
+DIAGNOSTICO.bat          junta informações quando algo não abre
+ATUALIZAR.bat            atualiza as bibliotecas
 sistema_cnd/
 ├── main.py              inicia o programa
 ├── config.yaml          todas as configurações (comentado)

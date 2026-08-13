@@ -1,0 +1,14 @@
+# Arquivos .bat e .cmd PRECISAM de quebra de linha do Windows (CRLF).
+# Com quebra de linha do Linux (LF) o cmd.exe nao consegue interpretar o
+# arquivo: a janela abre e fecha na hora, sem mostrar erro nenhum.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# O resto do projeto fica com quebra de linha padrao.
+*.py   text
+*.md   text
+*.yaml text
+*.html text
+*.css  text
+*.js   text
+*.csv  text eol=crlf

@@ -10,6 +10,10 @@ sistema_cnd/certidoes/*
 # Modelos de captcha aprendidos na máquina do usuário
 sistema_cnd/dados/
 
+# Logs gerados pelos .bat na máquina do usuário
+ultima_execucao.log
+diagnostico.txt
+
 # Logs e prints de depuração
 sistema_cnd/logs/*
 !sistema_cnd/logs/.gitkeep
