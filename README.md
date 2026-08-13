@@ -133,7 +133,7 @@ Colunas da planilha:
 | `inscricao_municipal` | não | |
 | `regime_tributario` | não | Simples Nacional, Lucro Presumido, Lucro Real… |
 | `ativa` | não | `sim` ou `nao`. Em branco = ativa. |
-| `certidoes` | não | Separadas por vírgula: `FEDERAL,CNDT,FGTS,ESTADUAL_GO,MUNICIPAL`. Em branco = o sistema sugere. |
+| `certidoes` | não | Separadas por vírgula: `FEDERAL,CNDT,FGTS,ESTADUAL_GO,MUNICIPAL`. Em branco = o sistema sugere. Marque `MUNICIPAL` nas empresas de Caldas Novas. |
 | `observacoes` | não | |
 
 **Importar de novo o mesmo CNPJ atualiza o cadastro, nunca duplica.**
@@ -305,7 +305,7 @@ sistema_cnd/
 │   │                    — resolve captcha de imagem e hCaptcha
 │   ├── fgts_caixa.py    CRF / Caixa
 │   ├── sefaz_go.py      SEFAZ Goiás
-│   └── municipal_XXX.py prefeitura a definir
+│   └── municipal_prodata.py  prefeituras que usam Prodata SIG (Caldas Novas)
 ├── dados/               o que o sistema aprende sozinho (modelos de captcha)
 ├── certidoes/           PDFs: {CNPJ}/{AAAA-MM}/{TIPO}_{AAAAMMDD}.pdf
 └── logs/
@@ -333,9 +333,26 @@ consertar um site nunca quebre os outros.
 | 2. Robô CNDT (TST) | 🟡 protocolo confirmado; a leitura do captcha ainda falha às vezes |
 | 3. Robô SEFAZ-GO | ✅ **pronto e emitindo de verdade** |
 | 4. Robô FGTS (Caixa) | 🟡 escrito — depende de rodar na sua máquina (veja abaixo) |
-| 5. Robô Federal (RFB/PGFN) | 🟡 endereço corrigido (#/home/cnpj); exige hCaptcha |
+| 5. Robô Federal (RFB/PGFN) | 🟡 endereço e campo corrigidos; modo assistido para o captcha |
+| 5b. Robô Municipal (Caldas Novas) | 🟡 escrito, sem captcha — falta o primeiro teste real |
 | 6. Agendador e alertas | 🟡 próxima — rotina diária já funciona; faltam os ajustes finos |
 | 7. Empacotamento, .bat e README | 🟡 já utilizável; revisão final na última etapa |
+
+### Sobre o robô Municipal (Caldas Novas)
+
+A prefeitura usa o sistema **Prodata SIG**, e é a melhor notícia das cinco
+certidões: **não tem captcha nenhum**. O robô preenche o CNPJ, pesquisa,
+seleciona o contribuinte e manda imprimir — tudo sozinho.
+
+Dois pontos que valem saber:
+
+- **Se a prefeitura recusar a emissão** por pendência no cadastro, o sistema
+  registra isso como certidão positiva, com a explicação. Não é falha do robô:
+  é preciso resolver junto ao município.
+- **O mesmo robô serve para outras cidades.** A Prodata atende dezenas de
+  prefeituras com a tela idêntica. Se você pegar um cliente de outra cidade que
+  use Prodata, abra a consulta de débitos no site dela, copie o endereço da
+  barra e cole em `certidoes.MUNICIPAL.url` no `config.yaml`.
 
 ### Se a trabalhista (CNDT) falhar no captcha
 

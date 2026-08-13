@@ -24,7 +24,7 @@ MODULOS: dict[str, str] = {
     "CNDT": "robos.cndt_tst",
     "FGTS": "robos.fgts_caixa",
     "ESTADUAL_GO": "robos.sefaz_go",
-    "MUNICIPAL": "robos.municipal_XXX",
+    "MUNICIPAL": "robos.municipal_prodata",
 }
 
 

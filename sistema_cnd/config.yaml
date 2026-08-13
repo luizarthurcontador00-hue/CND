@@ -251,12 +251,19 @@ certidoes:
     fins_espolio: false
 
   MUNICIPAL:
-    nome: "Municipal — (prefeitura ainda a definir)"
-    # Deixe false até me informar qual prefeitura e eu preencher o robô.
-    ativo: false
+    nome: "Municipal — Caldas Novas (GO)"
+    ativo: true
     validade_padrao_dias: 90
     janela_renovacao_dias: 15
+    # Confirmado: o sistema da prefeitura NÃO usa captcha.
     tem_captcha: false
+
+    # Endereço da consulta de débitos do contribuinte.
+    # O sistema é o Prodata SIG, usado por dezenas de prefeituras com o mesmo
+    # formato de tela. Se você pegar um cliente de outra cidade que use Prodata,
+    # troque só este endereço — o robô continua funcionando. Basta abrir o site
+    # da prefeitura, ir na consulta de débitos e copiar o endereço da barra.
+    url: "https://caldasnovas.prodataweb.inf.br/sig/app.html#/servicosonline/debito-contribuinte"
 
 
 # -----------------------------------------------------------------------------
