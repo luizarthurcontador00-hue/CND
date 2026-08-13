@@ -17,6 +17,20 @@ Mecânica real da emissão, nesta ordem:
   3. POST /gerarCertidao.faces  -> formulário + resposta do captcha (AJAX RichFaces)
   4. GET  /emissaoCertidao      -> o PDF em si
 
+CORREÇÃO GRAVE (confirmada contra o site real, agosto/2026): o passo 3 estava
+SEMPRE sendo ignorado pelo servidor, acertando o captcha ou não. O botão
+"Emitir Certidão" da tela é um botão AJAX do RichFaces 3.x, e esse framework
+só trata um POST como uma submissão de verdade quando ele carrega um
+parâmetro extra chamado `AJAXREQUEST` (o id do container que o RichFaces vai
+atualizar — lido do próprio onclick do botão, em `'containerId':'...'`). Sem
+esse parâmetro, o servidor devolve de volta o MESMO formulário em branco,
+sem processar nada — nem erro, nem sucesso. Isso explica por que a leitura
+do captcha "falhava às vezes": na prática falhava SEMPRE, e o sistema nunca
+chegou a testar a leitura contra o servidor de verdade. Confirmado ao vivo:
+sem `AJAXREQUEST` o servidor devolve `text/html` com o formulário intacto;
+com ele, devolve `text/xml` com a mensagem real ("Código de validação
+inválido." pra um captcha errado, por exemplo).
+
 POR QUE httpx E NÃO PLAYWRIGHT
 ------------------------------
 Este robô não abre navegador. A página é um JSF antigo e todo o fluxo cabe em
@@ -100,6 +114,19 @@ def _viewstate(html: str) -> str | None:
         if achado:
             return achado.group(1)
     return None
+
+
+def _container_id(html: str) -> str | None:
+    """Extrai o `containerId` do onclick do botão "Emitir Certidão".
+
+    É o valor que precisa ir no parâmetro AJAXREQUEST do POST — sem ele, o
+    RichFaces 3.x não reconhece o envio como uma submissão AJAX de verdade e
+    devolve o formulário em branco de volta, sem processar nada (nem erro,
+    nem sucesso). Extraído da página, não fixado no código, porque é gerado
+    a partir do JSP do site — se o portal for atualizado, muda sozinho.
+    """
+    achado = re.search(r"'containerId'\s*:\s*'([^']+)'", html)
+    return achado.group(1) if achado else None
 
 
 def _texto_visivel(html: str) -> str:
@@ -222,6 +249,15 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
                     )
                     break
 
+                container_id = _container_id(pagina.text)
+                if not container_id:
+                    ultimo_html = pagina.text
+                    ultimo_motivo = (
+                        "não encontrei o identificador do botão de emitir na página — "
+                        "o site do TST provavelmente mudou de layout"
+                    )
+                    break
+
                 token, imagem = _pegar_captcha(cliente)
                 texto, confiavel, origem, leitura = _resolver_captcha(
                     imagem, contexto, biblioteca
@@ -242,6 +278,7 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
                 envio = cliente.post(
                     URL_EMISSAO,
                     data={
+                        "AJAXREQUEST": container_id,
                         "gerarCertidaoForm": "gerarCertidaoForm",
                         "gerarCertidaoForm:podeFazerDownload": "false",
                         "gerarCertidaoForm:cpfCnpj": formatar_cnpj(numero),

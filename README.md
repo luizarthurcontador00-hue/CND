@@ -335,7 +335,7 @@ consertar um site nunca quebre os outros.
 | Etapa | Situação |
 |---|---|
 | 1. Estrutura, banco, modelos, interface | ✅ pronta |
-| 2. Robô CNDT (TST) | 🟡 protocolo confirmado; a leitura do captcha ainda falha às vezes |
+| 2. Robô CNDT (TST) | 🟡 corrigido um bug grave que travava toda emissão; falta confirmar numa emissão real completa |
 | 3. Robô SEFAZ-GO | ✅ **pronto e emitindo de verdade** |
 | 4. Robô FGTS (Caixa) | 🟡 escrito — depende de rodar na sua máquina (veja abaixo) |
 | 5. Robô Federal (RFB/PGFN) | 🟡 corrigido o bug que fazia desistir sempre da emissão; falta confirmar numa nova emissão real |
@@ -385,16 +385,31 @@ o popup cobre a tela toda, não só a caixinha branca que aparece nele. Agora o
 robô fecha esse popup (o "X" no canto) antes de seguir para o "Imprimir
 certidão".
 
-### Se a trabalhista (CNDT) falhar no captcha
+### Sobre o robô da CNDT (trabalhista)
 
-O envio ao TST está correto — isso foi confirmado testando o protocolo direto
-com o site. O que às vezes falha é a **leitura da imagem**: 16 das 36 letras e
-números possíveis nunca apareceram nas amostras que usei para ensinar o
-sistema, e nessas ele erra mais.
+**Corrigido um bug grave (confirmado ao vivo contra o site do TST,
+agosto/2026): o robô não estava realmente enviando o captcha, nunca.** O
+botão "Emitir Certidão" da tela é um botão de AJAX do RichFaces (a mesma
+tecnologia usada em vários sites do governo), e esse framework só processa o
+envio quando ele carrega um parâmetro extra chamado `AJAXREQUEST`. Sem esse
+parâmetro, o site do TST **devolvia o formulário em branco de volta, sempre**
+— acertando o captcha ou não — sem nunca aplicar a resposta. Por fora,
+parecia "a leitura do captcha falha às vezes"; na prática, o envio nunca
+tinha sido processado nenhuma vez. Descobri isso comparando, ao vivo, a
+resposta do site com e sem esse parâmetro: sem ele, `text/html` com o
+formulário intacto; com ele, `text/xml` com a mensagem real do site (por
+exemplo "Código de validação inválido." para um captcha errado) — a prova de
+que o site realmente processou o envio dessa vez. Corrigido lendo esse
+parâmetro direto da página (não fixado no código, porque é gerado pelo
+próprio site).
 
-Isso se resolve sozinho com o uso, e você pode acelerar:
+Com isso corrigido, o robô agora testa a leitura do captcha contra o site de
+verdade, e o mecanismo de aprendizado (guardar os caracteres de todo acerto)
+passa a funcionar de verdade também — antes disso nunca tinha uma chance real
+de aprender, porque nenhuma tentativa era processada. Se mesmo assim uma CNDT
+falhar por causa do captcha:
 
-1. Quando uma CNDT falhar, abra a pasta `sistema_cnd/logs/debug/`.
+1. Abra a pasta `sistema_cnd/logs/debug/`.
 2. Pegue os arquivos que começam com **`captcha_`** (são as imagens que o
    sistema não conseguiu ler) e **me mande**.
 3. Eu acrescento essas letras à biblioteca e o sistema passa a acertá-las.
