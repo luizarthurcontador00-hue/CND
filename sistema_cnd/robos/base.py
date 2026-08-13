@@ -28,7 +28,7 @@ import re
 import time
 import unicodedata
 from dataclasses import asdict, dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -187,6 +187,52 @@ def procurar_datas(texto: str) -> list[date]:
     return achadas
 
 
+#: Meses por extenso, já sem acento (o texto é normalizado antes da busca).
+MESES = {
+    "janeiro": 1, "fevereiro": 2, "marco": 3, "abril": 4,
+    "maio": 5, "junho": 6, "julho": 7, "agosto": 8,
+    "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
+}
+
+_DATA_POR_EXTENSO = re.compile(
+    r"\b(\d{1,2})\s*(?:de\s+)?(" + "|".join(MESES) + r")\s*(?:de\s+)?(\d{4})\b"
+)
+
+
+def procurar_datas_por_extenso(texto: str) -> list[date]:
+    """Datas escritas por extenso, como '13 AGOSTO DE 2026' ou '1 de maio de 2026'.
+
+    A SEFAZ-GO imprime a data de emissão só neste formato — não há nenhum
+    dd/mm/aaaa no PDF dela.
+    """
+    achadas = []
+    for dia, mes, ano in _DATA_POR_EXTENSO.findall(normalizar(texto)):
+        try:
+            achadas.append(date(int(ano), MESES[mes], int(dia)))
+        except ValueError:
+            continue
+    return achadas
+
+
+def todas_as_datas(texto: str) -> list[date]:
+    """Datas em número e por extenso, juntas."""
+    return procurar_datas(texto) + procurar_datas_por_extenso(texto)
+
+
+_PRAZO_EM_DIAS = re.compile(r"valid[ao]\s+por\s+(\d{1,4})\s*dias?")
+
+
+def prazo_em_dias(texto: str) -> int | None:
+    """Lê 'Certidao VALIDA POR 120 DIAS' e devolve 120.
+
+    Alguns órgãos não imprimem a data de vencimento, só o prazo. Nesse caso a
+    validade é calculada a partir da data de emissão do próprio documento —
+    o que continua sendo melhor do que usar o prazo fixo do config.yaml.
+    """
+    achado = _PRAZO_EM_DIAS.search(normalizar(texto))
+    return int(achado.group(1)) if achado else None
+
+
 # =============================================================================
 #  ARQUIVOS
 # =============================================================================
@@ -319,6 +365,7 @@ _PISTAS_EMISSAO = (
     "emissao:",
     "emitido em",
     "expedida em",
+    "local e data",  # SEFAZ-GO: "LOCAL E DATA: GOIANIA, 13 AGOSTO DE 2026"
 )
 
 
@@ -335,7 +382,14 @@ def extrair_datas_do_pdf(caminho: Path | str) -> tuple[date | None, date | None]
 
 
 def extrair_datas_do_texto(texto: str) -> tuple[date | None, date | None]:
-    """Mesma lógica de extrair_datas_do_pdf, mas a partir de um texto pronto."""
+    """Mesma lógica de extrair_datas_do_pdf, mas a partir de um texto pronto.
+
+    Entende três jeitos de o documento informar a validade, nesta ordem:
+      1. uma data explícita depois de "válida até" / "vencimento";
+      2. um prazo em dias ("VÁLIDA POR 120 DIAS") somado à data de emissão —
+         é assim que a SEFAZ-GO faz, e ela nem imprime data em número;
+      3. plano B: a data futura mais distante encontrada no documento.
+    """
     limpo = normalizar(texto)
     emissao: date | None = None
     validade: date | None = None
@@ -346,7 +400,7 @@ def extrair_datas_do_texto(texto: str) -> tuple[date | None, date | None]:
             return None
         # Olha os 120 caracteres seguintes à pista.
         trecho = limpo[pos : pos + 120]
-        datas = procurar_datas(trecho)
+        datas = todas_as_datas(trecho)
         return datas[0] if datas else None
 
     for pista in _PISTAS_VALIDADE:
@@ -359,16 +413,26 @@ def extrair_datas_do_texto(texto: str) -> tuple[date | None, date | None]:
         if emissao:
             break
 
-    # Plano B: se achou só uma data no documento inteiro e ela é futura, é a validade.
+    todas = todas_as_datas(limpo)
+
+    if emissao is None and todas:
+        # A emissão é a data passada mais recente do documento — as outras
+        # costumam ser referências legais antigas.
+        passadas = [d for d in todas if d <= date.today()]
+        if passadas:
+            emissao = max(passadas)
+
+    # Prazo em dias, quando não há data de vencimento impressa.
     if validade is None:
-        todas = procurar_datas(limpo)
+        dias = prazo_em_dias(limpo)
+        if dias and emissao:
+            validade = emissao + timedelta(days=dias)
+
+    # Plano B: a data futura mais distante do documento.
+    if validade is None:
         futuras = [d for d in todas if d >= date.today()]
         if futuras:
             validade = max(futuras)
-        if emissao is None and todas:
-            passadas = [d for d in todas if d <= date.today()]
-            if passadas:
-                emissao = max(passadas)
 
     return emissao, validade
 
@@ -390,8 +454,6 @@ def validade_com_fallback(
 
     dias = int(regras.get("validade_padrao_dias") or 0)
     if dias > 0:
-        from datetime import timedelta
-
         logger.info(
             "Não consegui ler a validade no PDF; usando o prazo padrão de %d dias.", dias
         )

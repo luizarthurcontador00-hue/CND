@@ -191,7 +191,7 @@ O robô só emite o que está dentro da **janela de renovação** de cada certid
 | Federal (RFB/PGFN) | 180 dias | 30 dias antes de vencer |
 | Trabalhista (CNDT) | 180 dias | 30 dias antes de vencer |
 | **FGTS (CRF)** | **30 dias** | **10 dias antes de vencer** (regra do próprio site — tentar antes é recusado) |
-| Estadual (SEFAZ-GO) | ~60 dias | 15 dias antes de vencer |
+| Estadual (SEFAZ-GO) | **120 dias** (o PDF emitido diz isso) | 15 dias antes de vencer |
 
 Entre uma consulta e outra no mesmo site o robô espera de 3 a 8 segundos, e faz
 no máximo 3 tentativas por certidão.
@@ -270,11 +270,33 @@ consertar um site nunca quebre os outros.
 |---|---|
 | 1. Estrutura, banco, modelos, interface | ✅ pronta |
 | 2. Robô CNDT (TST) | ✅ escrito e testado offline — falta a primeira emissão de verdade na sua máquina |
-| 3. Robô SEFAZ-GO | ⏳ próxima |
-| 4. Robô FGTS (Caixa) | ⏳ |
+| 3. Robô SEFAZ-GO | ✅ **pronto e emitindo de verdade** |
+| 4. Robô FGTS (Caixa) | ⏳ próxima |
 | 5. Robô Federal (RFB/PGFN) | ⏳ |
 | 6. Agendador e alertas | 🟡 rotina diária já funciona; ajustes finos pendentes |
 | 7. Empacotamento, .bat e README | 🟡 já utilizável; revisão final na última etapa |
+
+### Sobre o robô da SEFAZ-GO
+
+Este é o primeiro robô **validado emitindo certidões de verdade**: o teste
+automatizado emite dois documentos reais no site da SEFAZ e confere o resultado.
+
+Três coisas saíram diferentes do levantamento inicial:
+
+1. **O endereço mudou.** O `001frmEmiteCertidao_c.asp` redireciona para
+   `default.asp`. O robô já aponta para o endereço final.
+2. **Existe uma tela de confirmação** que não constava no levantamento, e ela
+   só aparece às vezes: quando o CNPJ tem cadastro em Goiás, o site pergunta
+   "Confirma o Nome do Contribuinte: FULANO?" antes de emitir. Quando não tem,
+   o PDF vem direto. O robô trata os dois caminhos.
+3. **A validade é de 120 dias, não ~60.** O PDF diz, em texto,
+   "Certidao VALIDA POR 120 DIAS", e não imprime nenhuma data em número — a
+   data de emissão aparece só por extenso ("GOIANIA, 13 AGOSTO DE 2026").
+   O sistema lê as duas coisas e calcula a validade. Foi exatamente por isso
+   que ficou combinado não fixar prazo no código.
+
+Confirmado também que **a SEFAZ-GO não usa captcha**, então o robô emite
+sozinho, sem nenhuma intervenção sua.
 
 ### Sobre o robô do CNDT
 

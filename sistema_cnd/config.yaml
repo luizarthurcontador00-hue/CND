@@ -210,12 +210,14 @@ certidoes:
   ESTADUAL_GO:
     nome: "Estadual — SEFAZ Goiás"
     ativo: true
-    validade_padrao_dias: 60
+    # CORRIGIDO: os PDFs realmente emitidos dizem "VALIDA POR 120 DIAS",
+    # não os ~60 que constavam no levantamento inicial. De todo jeito, o
+    # sistema lê o prazo de dentro do próprio PDF; este número só é usado
+    # se a leitura falhar.
+    validade_padrao_dias: 120
     janela_renovacao_dias: 15
+    # Confirmado: a SEFAZ-GO não usa captcha.
     tem_captcha: false
-    # Tenta primeiro por requisição direta (rápido). Se falhar, cai para o
-    # navegador automatizado. Deixe true.
-    tentar_sem_navegador: true
     # A opção "para fins de espólio" do site. Deixe sempre false.
     fins_espolio: false
 
