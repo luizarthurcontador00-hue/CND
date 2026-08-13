@@ -100,13 +100,29 @@ function acompanharProgresso() {
 
         if (!d.ativo) {
           paradas += 1;
-          // Depois de terminar, recarrega a página uma vez para atualizar as listas.
+          // Depois de terminar, avisa que dá pra atualizar — sem recarregar
+          // sozinho. Recarregar na sua frente apaga qualquer seleção que você
+          // estivesse fazendo na tela (empresas, certidões marcadas).
           if (paradas === 1 && d.total > 0) {
-            setTimeout(function () { window.location.reload(); }, 2500);
+            mostrarAvisoConcluido();
           }
         }
       })
       .catch(function () { /* servidor reiniciando — tenta de novo no próximo ciclo */ });
+  }
+
+  function mostrarAvisoConcluido() {
+    if (document.getElementById('aviso-rodada-concluida')) return;
+    const aviso = document.createElement('div');
+    aviso.id = 'aviso-rodada-concluida';
+    aviso.className = 'aviso aviso-info';
+    aviso.innerHTML =
+      '<span>Consulta concluída — o histórico e o painel já têm o resultado. ' +
+      'Atualize esta tela quando quiser ver a lista renovada.</span>' +
+      '<button type="button" class="botao pequeno secundario" ' +
+      'onclick="window.location.reload()" style="margin-left:8px">Atualizar agora</button>' +
+      '<button type="button" class="fechar" onclick="this.parentElement.remove()">✕</button>';
+    painel.parentElement.insertBefore(aviso, painel);
   }
 
   atualizar();

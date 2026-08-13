@@ -70,14 +70,39 @@ URL_PADRAO = (
 )
 
 #: Onde procurar o campo do CNPJ, em ordem de preferência.
+#:
+#: ATENÇÃO — a tela real usa componentes customizados do Prodata
+#: (<pd-input-text>), e o Angular gera para o <input> de dentro um id
+#: NUMÉRICO tipo "64inputText". Um id começando com dígito é seletor CSS
+#: inválido (document.querySelector('#64inputText') estoura erro), então
+#: nunca dá pra contar com o id. O que é estável é o atributo "label" e
+#: "tipo" do PRÓPRIO componente <pd-input-text>, escritos pelo template da
+#: tela e que não mudam de uma carga de página para outra:
+#:   <pd-input-text label="CPF/CNPJ" tipo="cpfCnpj"><input id="64inputText">
 SELETORES_CNPJ = (
+    'pd-input-text[tipo="cpfCnpj"] input',
+    'pd-input-text[label="CPF/CNPJ"] input',
+    'pd-input-text[label*="CNPJ" i] input',
+    # Alternativas para outras prefeituras Prodata que fujam desse padrão.
     'input[name*="cnpj" i]',
     'input[id*="cnpj" i]',
-    'input[ng-model*="cnpj" i]',
     'input[placeholder*="cnpj" i]',
 )
+#: Idem para o botão — pelo texto visível, não por id.
 PISTAS_BOTAO_PESQUISAR = ("pesquisar", "consultar", "buscar")
 PISTAS_BOTAO_IMPRIMIR = ("imprimir certidao", "imprimir certidão", "imprimir", "certidao", "certidão")
+
+#: O tipo de certidão certo (Débitos/CND) já vem marcado por padrão na tela,
+#: mas o robô confirma por segurança — a prefeitura pode mudar o padrão.
+#:
+#: ATENÇÃO — não é um <input type=radio> nativo. É um componente do Angular
+#: Material (<md-radio-button role="radio" aria-checked="true">), sem input
+#: nenhum por dentro. Um seletor terminado em " input" nunca acharia nada.
+#: ATENÇÃO — "value=2" NÃO é exclusivo desta opção: a tela tem outro grupo
+#: de rádio ("Débitos ativos"/"Débitos liquidados por período") que também
+#: usa value="1"/"2". Usar só o valor pegaria o radio errado. O aria-label
+#: com o texto "CND" é o único jeito confiável de mirar exatamente este.
+SELETOR_RADIO_CND = 'md-radio-button[aria-label*="CND" i], [role="radio"][aria-label*="CND" i]'
 
 #: Mensagem que o sistema mostra quando se recusa a emitir.
 PISTAS_BLOQUEIO = (
@@ -114,25 +139,42 @@ def _visivel(elemento) -> bool:
 
 
 def _campo_cnpj(pagina):
-    """Acha o campo do CNPJ, sempre devolvendo um <input> de verdade."""
+    """Acha o campo do CNPJ, sempre devolvendo um <input> de verdade.
+
+    Tenta os seletores estáveis primeiro (atributo do componente). Se nenhum
+    bater, usa get_by_label do Playwright, que resolve <label for="..."> pela
+    árvore de acessibilidade — funciona mesmo com id numérico, que quebraria
+    um seletor CSS "#64inputText".
+    """
     for seletor in SELETORES_CNPJ:
         for elemento in pagina.query_selector_all(seletor):
             if _visivel(elemento) and _e_input(elemento):
                 return elemento
 
-    # Nenhum nome bateu: procura pelo rótulo escrito ao lado do campo.
-    for rotulo in pagina.query_selector_all("label"):
-        try:
-            if "cnpj" not in normalizar(rotulo.inner_text() or ""):
-                continue
-            alvo = rotulo.get_attribute("for")
-            if alvo:
-                campo = pagina.query_selector(f"#{alvo}")
-                if campo and _visivel(campo) and _e_input(campo):
-                    return campo
-        except Exception:
-            continue
+    try:
+        candidato = pagina.get_by_label("CPF/CNPJ", exact=True).element_handle(timeout=3000)
+        if candidato and _visivel(candidato) and _e_input(candidato):
+            return candidato
+    except Exception:
+        pass
+
     return None
+
+
+def _confirmar_tipo_certidao_cnd(pagina) -> None:
+    """Garante que a opção 'Débitos (CND)' está marcada, não a de espólio/outra.
+
+    Sendo um componente Angular Material (não um <input> nativo), a marcação
+    fica no atributo aria-checked, e é o próprio elemento que se clica —
+    não existe um .check()/.is_checked() de verdade aqui.
+    """
+    try:
+        radio = pagina.query_selector(SELETOR_RADIO_CND)
+        if radio and _visivel(radio) and radio.get_attribute("aria-checked") != "true":
+            radio.click()
+            logger.info("[MUNICIPAL] Marquei a opção 'Débitos (CND)'.")
+    except Exception as e:
+        logger.debug("Não consegui conferir o tipo de certidão (seguindo com o padrão): %s", e)
 
 
 def _e_input(elemento) -> bool:
@@ -169,8 +211,15 @@ def _achar_botao(pagina, pistas):
 
 
 def _selecionar_primeira_linha(pagina) -> bool:
-    """O sistema exige um contribuinte selecionado antes de imprimir."""
+    """O sistema exige um contribuinte selecionado antes de imprimir.
+
+    A grade é o angular-ui-grid (classes .ui-grid-row / .ui-grid-cell,
+    confirmadas na página real da prefeitura) dentro de um .ui-grid-canvas —
+    daí a preferência pelo seletor mais específico primeiro, para não cair
+    sem querer numa célula do cabeçalho da tabela.
+    """
     for seletor in (
+        ".ui-grid-canvas .ui-grid-row .ui-grid-cell",
         ".ui-grid-row:not(.ui-grid-header) .ui-grid-cell",
         "table tbody tr td",
         "tr[ng-repeat] td",
@@ -271,6 +320,7 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
                 salvar_debug(pasta_debug, TIPO, numero, html=html, screenshot=print_tela),
             )
 
+        _confirmar_tipo_certidao_cnd(pagina)
         campo.fill(formatar_cnpj(numero))
 
         # ------------------------------------------------------ 2) pesquisar

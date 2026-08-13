@@ -132,7 +132,14 @@ SELETORES_DOCUMENTO = (
 
 #: Usado só para esperar a tela aparecer.
 SELETOR_DOCUMENTO = ", ".join(SELETORES_DOCUMENTO)
-PISTAS_BOTAO_ENVIAR = ("emitir", "consultar", "continuar", "avançar", "avancar", "enviar")
+
+#: ATENÇÃO — "Emitir Certidão" e "Consultar Certidão" aparecem LADO A LADO
+#: na mesma tela (confirmado no HTML real do portal). Uma lista de pistas
+#: genérica que aceitasse as duas palavras clicaria sempre na primeira que
+#: aparecesse no HTML — que é "Consultar Certidão" — mesmo numa tentativa de
+#: emissão nova. Por isso cada ação tem sua lista própria, sem sobreposição.
+PISTAS_BOTAO_EMITIR = ("emitir certidao", "emitir certidão", "emitir")
+PISTAS_BOTAO_CONSULTAR_2VIA = ("consultar certidao", "consultar certidão")
 PISTAS_BOTAO_PDF = ("pdf", "imprimir", "baixar", "salvar", "download", "2ª via", "2a via", "segunda via")
 
 #: Frases do portal que indicam que a emissão nova foi recusada e o caminho é
@@ -278,12 +285,77 @@ def _sitekey_hcaptcha(pagina) -> str | None:
 
 
 def _tem_hcaptcha(pagina) -> bool:
+    """Existe ALGUM widget de hCaptcha na página — não diz se ele está pedindo algo.
+
+    CUIDADO: o portal tem hCaptcha em DOIS lugares — um no botão "Entrar com
+    gov.br" do cabeçalho e outro, o que interessa, junto do formulário de
+    emissão — e os dois ficam sempre presentes no HTML, escondidos
+    (aria-hidden="true"), mesmo quando ninguém precisa resolver nada. Usar só
+    esta função para decidir se o robô está bloqueado dava falso positivo
+    sempre. Para saber se HÁ MESMO um desafio pendente, use
+    `_desafio_hcaptcha_visivel`.
+    """
     try:
         return bool(
             pagina.query_selector(".h-captcha, [data-sitekey], iframe[src*='hcaptcha']")
         )
     except Exception:
         return False
+
+
+def _desafio_hcaptcha_visivel(pagina) -> bool:
+    """Há um desafio do hCaptcha DE VERDADE pedindo alguma coisa na tela?
+
+    O widget do formulário de emissão é do tipo "invisível": ele roda sozinho
+    quando o formulário é enviado, e só aparece alguma coisa na tela se o
+    hCaptcha desconfiar do visitante. Por isso a presença do elemento no HTML
+    não quer dizer nada — vários iframes do hCaptcha existem SEMPRE, mesmo sem
+    desafio nenhum, incluindo alguns que nem têm aria-hidden e têm largura e
+    altura normais (300x150), só que POSICIONADOS FORA DA TELA
+    (top: -9999px) — um jeito comum de esconder sem usar display:none.
+    Por isso o que importa não é só ter tamanho, é estar dentro da área
+    visível da janela.
+    """
+    try:
+        return bool(
+            pagina.evaluate(
+                """() => {
+                    const candidatos = document.querySelectorAll(
+                        'iframe[src*="hcaptcha"], .h-captcha, [data-hcaptcha-widget-id]'
+                    );
+                    for (const el of candidatos) {
+                        if (el.getAttribute('aria-hidden') === 'true') continue;
+                        const r = el.getBoundingClientRect();
+                        const temTamanho = r.width > 10 && r.height > 10;
+                        const dentroDaTela = r.bottom > 0 && r.right > 0 &&
+                            r.top < window.innerHeight && r.left < window.innerWidth;
+                        if (temTamanho && dentroDaTela) return true;
+                    }
+                    return false;
+                }"""
+            )
+        )
+    except Exception:
+        return False
+
+
+def _aguardar_desafio_ou_resultado(pagina, segundos: int = 15) -> bool:
+    """Depois de clicar em Emitir/Consultar, espera para ver se aparece um
+    desafio visível do hCaptcha.
+
+    Devolve True se um desafio apareceu (precisa ser resolvido), False se não
+    apareceu dentro do tempo — o que é o caminho comum: o hCaptcha invisível
+    passou sozinho e o portal já está processando o pedido.
+    """
+    tentativas = max(1, segundos * 2)
+    for _ in range(tentativas):
+        if _desafio_hcaptcha_visivel(pagina):
+            return True
+        try:
+            pagina.wait_for_timeout(500)
+        except Exception:
+            break
+    return False
 
 
 def _hcaptcha_resolvido(pagina) -> bool:
@@ -541,21 +613,28 @@ def _tentar_emitir(pagina, numero, contexto, regras, pasta_debug, url_emitir):
             salvar_debug(pasta_debug, TIPO, numero, html=html, screenshot=print_tela),
         )
 
-    if _tem_hcaptcha(pagina) and not _responder_hcaptcha(pagina, contexto):
+    # "Emitir Certidão" e "Consultar Certidão" ficam lado a lado na mesma
+    # tela — usar a lista certa é o que garante clicar no botão certo.
+    botao = _achar_botao(pagina, PISTAS_BOTAO_EMITIR)
+    if botao is None:
+        html, print_tela = capturar_estado(pagina)
+        return erro(
+            "Não encontrei o botão \"Emitir Certidão\" no portal da Receita.",
+            salvar_debug(pasta_debug, TIPO, numero, html=html, screenshot=print_tela),
+        )
+    botao.click()
+
+    # O hCaptcha do formulário é invisível: roda sozinho ao enviar, e só
+    # aparece alguma coisa na tela se desconfiar do visitante. Por isso a
+    # checagem é DEPOIS do clique, e só entra na conversa de captcha se um
+    # desafio de verdade aparecer.
+    if _aguardar_desafio_ou_resultado(pagina) and not _responder_hcaptcha(pagina, contexto):
         html, print_tela = capturar_estado(pagina)
         return captcha_falhou(
             _mensagem_captcha(contexto),
             salvar_debug(pasta_debug, TIPO, numero, html=html, screenshot=print_tela),
         )
 
-    botao = _achar_botao(pagina, PISTAS_BOTAO_ENVIAR)
-    if botao is None:
-        html, print_tela = capturar_estado(pagina)
-        return erro(
-            "Não encontrei o botão de emitir no portal da Receita.",
-            salvar_debug(pasta_debug, TIPO, numero, html=html, screenshot=print_tela),
-        )
-    botao.click()
     pagina.wait_for_load_state("networkidle")
 
     texto_pagina = pagina.inner_text("body")
@@ -589,16 +668,19 @@ def _tentar_segunda_via(
             salvar_debug(pasta_debug, TIPO, numero, html=html, screenshot=print_tela),
         )
 
-    if _tem_hcaptcha(pagina) and not _responder_hcaptcha(pagina, contexto):
-        html, print_tela = capturar_estado(pagina)
-        return captcha_falhou(
-            _mensagem_captcha(contexto),
-            salvar_debug(pasta_debug, TIPO, numero, html=html, screenshot=print_tela),
-        )
-
-    botao = _achar_botao(pagina, PISTAS_BOTAO_ENVIAR)
+    # A mesma tela oferece "Emitir Certidão" e "Consultar Certidão" — aqui
+    # queremos especificamente a segunda.
+    botao = _achar_botao(pagina, PISTAS_BOTAO_CONSULTAR_2VIA)
     if botao is not None:
         botao.click()
+
+        if _aguardar_desafio_ou_resultado(pagina) and not _responder_hcaptcha(pagina, contexto):
+            html, print_tela = capturar_estado(pagina)
+            return captcha_falhou(
+                _mensagem_captcha(contexto),
+                salvar_debug(pasta_debug, TIPO, numero, html=html, screenshot=print_tela),
+            )
+
         pagina.wait_for_load_state("networkidle")
 
     conteudo = _baixar_pdf(pagina)

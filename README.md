@@ -92,6 +92,11 @@ Se não abrir, digite esse endereço no navegador manualmente.
 | **Histórico** | Todas as emissões, link para abrir o PDF e **upload manual** quando o robô falhar. |
 | **Logs** | Cada rodada do robô e os arquivos de depuração das falhas. |
 
+> A tela **Consultas** não recarrega mais sozinha quando a rodada termina —
+> isso apagava qualquer marcação que você estivesse fazendo na hora. Agora ela
+> só avisa que terminou, com um botão "Atualizar agora" para você clicar
+> quando quiser.
+
 ### Como ler o semáforo do Painel
 
 | Cor | Significa |
@@ -333,8 +338,8 @@ consertar um site nunca quebre os outros.
 | 2. Robô CNDT (TST) | 🟡 protocolo confirmado; a leitura do captcha ainda falha às vezes |
 | 3. Robô SEFAZ-GO | ✅ **pronto e emitindo de verdade** |
 | 4. Robô FGTS (Caixa) | 🟡 escrito — depende de rodar na sua máquina (veja abaixo) |
-| 5. Robô Federal (RFB/PGFN) | 🟡 endereço e campo corrigidos; modo assistido para o captcha |
-| 5b. Robô Municipal (Caldas Novas) | 🟡 escrito, sem captcha — falta o primeiro teste real |
+| 5. Robô Federal (RFB/PGFN) | 🟡 endereço, campo e botão corrigidos; modo assistido para o captcha |
+| 5b. Robô Municipal (Caldas Novas) | ✅ testado contra a tela real da prefeitura |
 | 6. Agendador e alertas | 🟡 próxima — rotina diária já funciona; faltam os ajustes finos |
 | 7. Empacotamento, .bat e README | 🟡 já utilizável; revisão final na última etapa |
 
@@ -353,6 +358,24 @@ Dois pontos que valem saber:
   prefeituras com a tela idêntica. Se você pegar um cliente de outra cidade que
   use Prodata, abra a consulta de débitos no site dela, copie o endereço da
   barra e cole em `certidoes.MUNICIPAL.url` no `config.yaml`.
+
+**Testado contra a tela real da prefeitura** (o HTML que você mandou quando
+apareceu "Não encontrei o campo do CNPJ"). Achei três causas, todas na forma
+como a Prodata monta a tela em Angular, e não no robô em si:
+
+1. **O campo do CNPJ tem um `id` que começa com número** (`64inputText`), e
+   isso é inválido em CSS — o navegador rejeita a busca antes mesmo de
+   procurar, então o robô nunca via o campo. Troquei a busca para usar os
+   atributos do próprio componente (`pd-input-text`), que não mudam.
+2. **O botão "Débitos (CND)" não é uma caixinha comum** — é um componente do
+   Angular Material sem `<input>` por dentro, então o robô perguntava "está
+   marcado?" a algo que não sabia responder. Corrigido para ler o atributo
+   que o Angular usa de verdade.
+3. Uma segunda armadilha, encontrada só durante o teste: **duas opções
+   diferentes na tela compartilham o mesmo valor interno** (uma pergunta sobre
+   o tipo de consulta e outra sobre o tipo de certidão usam `"2"` para coisas
+   diferentes). Se o robô confiasse só nesse valor, podia marcar a opção
+   errada sem avisar. Agora ele usa o rótulo "CND", que é único na tela.
 
 ### Se a trabalhista (CNDT) falhar no captcha
 
@@ -419,6 +442,23 @@ o que aconteceu.
 sistema converte sozinho o CNPJ da filial no da matriz — **recalculando os dois
 dígitos verificadores**, que mudam junto. (Aproveitar os dígitos da filial
 geraria um CNPJ inválido; foi um erro que o teste pegou antes de virar problema.)
+
+**Corrigido: o robô clicava no botão errado.** Quando você mandou a tela com o
+CNPJ certinho no campo mas dando "captcha não resolvido", a causa não era o
+captcha — era o clique. Na tela da Receita, "Consultar Certidão" (2ª via) e
+"Emitir Certidão" ficam lado a lado, e o robô usava uma lista de palavras-chave
+que reconhecia os dois botões sem diferenciar qual clicar, então às vezes
+apertava o errado. Agora cada botão tem sua própria lista, sem sobreposição.
+
+Achei também **dois falsos positivos no aviso de captcha**, ambos vindos de
+confundir "o hCaptcha existe na página" com "o hCaptcha está pedindo algo
+agora": o widget do hCaptcha fica sempre no HTML, mesmo escondido, porque o
+modo dele é "invisível" — só aparece se desconfiar do acesso. O robô conferia
+a existência dele antes até de clicar em Emitir, então travava sempre. Corrigi
+para só reagir quando o desafio aparece **visível na tela de verdade** (não
+escondido por `aria-hidden`, nem jogado fora da área visível), e só depois de
+clicar em Emitir — que é o momento em que o hCaptcha realmente decide se vai
+pedir algo.
 
 ### Sobre o robô do FGTS (leia antes de usar)
 
