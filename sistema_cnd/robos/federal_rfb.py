@@ -113,11 +113,25 @@ def _enderecos(regras: dict) -> tuple[str, str]:
         str(regras.get("url_consultar") or URL_CONSULTAR_PADRAO).strip(),
     )
 
-#: Campo do documento no formulário Angular do portal.
-SELETOR_DOCUMENTO = (
-    '[formcontrolname="niContribuinte"], input[placeholder*="CNPJ" i], '
-    'input[name="niContribuinte"]'
+#: Onde procurar o campo do documento, em ordem de preferência.
+#:
+#: ATENÇÃO — o portal usa o Design System do gov.br, e nele o
+#: formControlName fica no COMPONENTE QUE EMBRULHA o campo
+#: (<br-input formcontrolname="niContribuinte"><input ...></br-input>),
+#: não no <input> em si. Escrever no embrulho dá o erro
+#: "Element is not an <input>". Por isso a busca procura sempre o <input>
+#: de verdade, inclusive dentro do embrulho.
+SELETORES_DOCUMENTO = (
+    'input[formcontrolname="niContribuinte"]',
+    '[formcontrolname="niContribuinte"] input',
+    'input[name="niContribuinte"]',
+    '[formcontrolname="niContribuinte"] textarea',
+    'input[placeholder*="CNPJ" i]',
+    'input[id*="niContribuinte" i]',
 )
+
+#: Usado só para esperar a tela aparecer.
+SELETOR_DOCUMENTO = ", ".join(SELETORES_DOCUMENTO)
 PISTAS_BOTAO_ENVIAR = ("emitir", "consultar", "continuar", "avançar", "avancar", "enviar")
 PISTAS_BOTAO_PDF = ("pdf", "imprimir", "baixar", "salvar", "download", "2ª via", "2a via", "segunda via")
 
@@ -140,6 +154,46 @@ PISTAS_USE_SEGUNDA_VIA = (
 # =============================================================================
 #  AUXILIARES
 # =============================================================================
+
+
+def _campo_documento(pagina):
+    """Devolve o <input> onde se digita o CNPJ, ou None.
+
+    Procura nesta ordem: o próprio input com o formControlName, o input que
+    está DENTRO do componente com o formControlName, e por fim qualquer campo
+    de texto visível — o que salva a situação se o portal trocar os nomes.
+    """
+    for seletor in SELETORES_DOCUMENTO:
+        for elemento in pagina.query_selector_all(seletor):
+            if _e_campo_editavel(elemento):
+                return elemento
+
+    # Último recurso: se só existe um campo de texto visível na tela, é ele.
+    visiveis = [
+        e
+        for e in pagina.query_selector_all("input:not([type=hidden])")
+        if _e_campo_editavel(e)
+    ]
+    if len(visiveis) == 1:
+        logger.info("[FEDERAL] Usei o único campo de texto visível da tela.")
+        return visiveis[0]
+    return None
+
+
+def _e_campo_editavel(elemento) -> bool:
+    """True só para <input>/<textarea> visível em que dá para digitar."""
+    if elemento is None:
+        return False
+    try:
+        if not elemento.is_visible() or not elemento.is_enabled():
+            return False
+        etiqueta = (elemento.evaluate("e => e.tagName") or "").upper()
+        if etiqueta not in ("INPUT", "TEXTAREA"):
+            return False
+        tipo = (elemento.get_attribute("type") or "text").lower()
+        return tipo in ("text", "tel", "number", "search", "")
+    except Exception:
+        return False
 
 
 def _esperar_formulario(pagina, segundos: int = 30) -> bool:
@@ -452,10 +506,23 @@ def _preencher_documento(pagina, numero: str) -> bool:
                 pass
             break
 
-    campo = pagina.query_selector(SELETOR_DOCUMENTO)
+    campo = _campo_documento(pagina)
     if campo is None:
         return False
-    campo.fill(numero)
+
+    try:
+        campo.fill(numero)
+    except Exception as e:
+        # Alguns campos com máscara recusam o preenchimento direto; digitar
+        # tecla a tecla funciona neles.
+        logger.info("[FEDERAL] Preenchimento direto falhou (%s). Vou digitar.", e)
+        try:
+            campo.click()
+            campo.type(numero, delay=40)
+        except Exception as e2:
+            logger.warning("[FEDERAL] Não consegui escrever no campo do CNPJ: %s", e2)
+            return False
+
     return True
 
 
