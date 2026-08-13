@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+
+{# --------------------------------------------------------- upload manual #}
+<details class="cartao blocao">
+  <summary>Anexar PDF emitido à mão (quando o robô não conseguir)</summary>
+  <p class="explicacao" style="margin-top:10px">
+    Emitiu a certidão você mesmo no site? Anexe o PDF aqui. O sistema tenta ler a
+    data de validade de dentro do arquivo; se não conseguir, preencha o campo abaixo.
+    Assim o painel continua correto mesmo nas certidões que o robô não emite sozinho.
+  </p>
+  <form method="post" action="/historico/upload" enctype="multipart/form-data" class="formulario">
+    <div class="grade-2">
+      <div>
+        <label>Empresa *</label>
+        <select name="empresa_id" required>
+          <option value="">Escolha…</option>
+          {% for e in empresas %}
+            <option value="{{ e.id }}">{{ e.apelido }} — {{ e.cnpj|cnpj }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Certidão *</label>
+        <select name="tipo_certidao" required>
+          {% for valor, rotulo in TIPOS %}
+            <option value="{{ valor }}">{{ rotulo }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Resultado *</label>
+        <select name="status">
+          {% for valor, rotulo in STATUS %}
+            {% if valor in ['NEGATIVA', 'POSITIVA_COM_EFEITO_NEGATIVA', 'POSITIVA'] %}
+              <option value="{{ valor }}">{{ rotulo }}</option>
+            {% endif %}
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Validade <span class="opcional">(se souber — senão, leio do PDF)</span></label>
+        <input type="date" name="data_validade">
+      </div>
+      <div>
+        <label>Número da certidão <span class="opcional">(opcional)</span></label>
+        <input type="text" name="numero_certidao">
+      </div>
+      <div>
+        <label>Arquivo PDF *</label>
+        <input type="file" name="arquivo" accept=".pdf" required>
+      </div>
+    </div>
+    <div class="acoes">
+      <button type="submit" class="botao">Anexar PDF</button>
+    </div>
+  </form>
+</details>
+
+{# ---------------------------------------------------------------- filtros #}
+<div class="cartao">
+  <form method="get" action="/historico" class="filtros">
+    <div style="flex:1">
+      <label>Empresa</label>
+      <select name="empresa_id">
+        <option value="">Todas</option>
+        {% for e in empresas %}
+          <option value="{{ e.id }}" {{ 'selected' if filtro_empresa == e.id }}>{{ e.apelido }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Certidão</label>
+      <select name="tipo">
+        <option value="">Todas</option>
+        {% for valor, rotulo in TIPOS %}
+          <option value="{{ valor }}" {{ 'selected' if filtro_tipo == valor }}>{{ rotulo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Resultado</label>
+      <select name="status">
+        <option value="">Todos</option>
+        {% for valor, rotulo in STATUS %}
+          <option value="{{ valor }}" {{ 'selected' if filtro_status == valor }}>{{ rotulo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Período</label>
+      <select name="dias">
+        {% for d, r in [(30,'Últimos 30 dias'), (90,'Últimos 90 dias'), (365,'Último ano'), (0,'Tudo')] %}
+          <option value="{{ d }}" {{ 'selected' if filtro_dias == d }}>{{ r }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width:auto">
+      <button type="submit" class="botao secundario">Filtrar</button>
+      <a href="/historico" class="botao secundario">Limpar</a>
+    </div>
+  </form>
+</div>
+
+{# ---------------------------------------------------------------- tabela #}
+<div class="cartao">
+  <h2>{{ emissoes|length }} registro(s)</h2>
+
+  {% if not emissoes %}
+    <p class="sem-dados">Nenhuma emissão registrada com esses filtros.</p>
+  {% else %}
+  <div class="rolagem">
+    <table>
+      <thead>
+        <tr>
+          <th>Quando</th>
+          <th>Empresa</th>
+          <th>Certidão</th>
+          <th>Resultado</th>
+          <th>Emissão</th>
+          <th>Validade</th>
+          <th>Número</th>
+          <th>Origem</th>
+          <th class="centro">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for em in emissoes %}
+        {% set empresa = empresas_por_id.get(em.empresa_id) %}
+        <tr>
+          <td class="linha-secundaria" style="white-space:nowrap">{{ em.data_tentativa|data }}</td>
+          <td>
+            {{ empresa.apelido if empresa else '—' }}
+            <div class="linha-secundaria">{{ empresa.cnpj|cnpj if empresa else '' }}</div>
+          </td>
+          <td>{{ ROTULOS_TIPO.get(em.tipo_certidao, em.tipo_certidao) }}</td>
+          <td>
+            {% if em.status == 'NEGATIVA' %}
+              <span class="etiqueta verde">{{ ROTULOS_STATUS[em.status] }}</span>
+            {% elif em.status == 'POSITIVA_COM_EFEITO_NEGATIVA' %}
+              <span class="etiqueta verde">{{ ROTULOS_STATUS[em.status] }}</span>
+            {% elif em.status == 'POSITIVA' %}
+              <span class="etiqueta vermelho">{{ ROTULOS_STATUS[em.status] }}</span>
+            {% elif em.status == 'CAPTCHA_FALHOU' %}
+              <span class="etiqueta amarelo">{{ ROTULOS_STATUS[em.status] }}</span>
+            {% else %}
+              <span class="etiqueta vermelho">{{ ROTULOS_STATUS.get(em.status, em.status) }}</span>
+            {% endif %}
+            {% if em.mensagem_erro %}
+              <div class="linha-secundaria" title="{{ em.mensagem_erro }}">
+                {{ em.mensagem_erro[:90] }}{{ '…' if em.mensagem_erro|length > 90 }}
+              </div>
+            {% endif %}
+          </td>
+          <td>{{ em.data_emissao|data }}</td>
+          <td>
+            {{ em.data_validade|data }}
+            {% if em.data_validade %}
+              {% set dias = em.dias_para_vencer %}
+              <div class="linha-secundaria">
+                {% if dias < 0 %}vencida há {{ -dias }} dia(s)
+                {% elif dias == 0 %}vence hoje
+                {% else %}faltam {{ dias }} dia(s){% endif %}
+              </div>
+            {% endif %}
+          </td>
+          <td class="linha-secundaria">{{ em.numero_certidao or '—' }}</td>
+          <td>
+            <span class="etiqueta {{ 'azul' if em.origem == 'MANUAL' }}">
+              {{ 'Manual' if em.origem == 'MANUAL' else 'Robô' }}
+            </span>
+          </td>
+          <td class="centro" style="white-space:nowrap">
+            {% if em.caminho_pdf %}
+              <a href="/historico/{{ em.id }}/pdf" target="_blank" class="botao pequeno secundario">Abrir PDF</a>
+            {% endif %}
+            {% if em.html_debug %}
+              <a href="/logs" class="botao pequeno secundario" title="Há arquivos de depuração desta falha">Debug</a>
+            {% endif %}
+            <form method="post" action="/historico/{{ em.id }}/excluir" style="display:inline"
+                  data-confirmar="Remover este registro do histórico? O PDF continua salvo na pasta.">
+              <button type="submit" class="botao pequeno perigo">Remover</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

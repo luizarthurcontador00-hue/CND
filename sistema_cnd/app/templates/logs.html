@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block acoes_cabecalho %}
+  {% if agendador_ativo and proxima_rodada %}
+    <span class="etiqueta azul">Próxima rodada automática: {{ proxima_rodada|data }}</span>
+  {% else %}
+    <span class="etiqueta">Agendamento desligado no config.yaml</span>
+  {% endif %}
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="cartao">
+  <h2>Últimas execuções</h2>
+  <p class="explicacao">
+    Cada linha é uma rodada do robô. Clique para ver o resultado empresa por empresa.
+  </p>
+
+  {% if not execucoes %}
+    <p class="sem-dados">
+      Nenhuma execução registrada ainda.<br>
+      <a href="/consultas">Rodar uma consulta agora</a>.
+    </p>
+  {% else %}
+  <div class="rolagem">
+    <table>
+      <thead>
+        <tr>
+          <th>#</th><th>Início</th><th>Duração</th><th>Tipo</th>
+          <th class="centro">Emitidas</th><th class="centro">Falhas</th>
+          <th class="centro">Puladas</th><th class="centro">Detalhe</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ex in execucoes %}
+        <tr>
+          <td>{{ ex.id }}</td>
+          <td style="white-space:nowrap">{{ ex.inicio|data }}</td>
+          <td class="linha-secundaria">
+            {% if ex.em_andamento %}
+              <span class="etiqueta amarelo">em andamento</span>
+            {% else %}
+              {{ '%.0f'|format(ex.duracao_segundos or 0) }}s
+            {% endif %}
+          </td>
+          <td>
+            <span class="etiqueta {{ 'azul' if ex.tipo == 'AGENDADA' }}">
+              {{ 'Automática' if ex.tipo == 'AGENDADA' else 'Manual' }}
+            </span>
+          </td>
+          <td class="centro">
+            {% if ex.total_sucesso %}<span class="etiqueta verde">{{ ex.total_sucesso }}</span>
+            {% else %}0{% endif %}
+          </td>
+          <td class="centro">
+            {% if ex.total_falha %}<span class="etiqueta vermelho">{{ ex.total_falha }}</span>
+            {% else %}0{% endif %}
+          </td>
+          <td class="centro linha-secundaria">{{ ex.total_pulado }}</td>
+          <td class="centro"><a href="/logs/{{ ex.id }}" class="botao pequeno secundario">Ver</a></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+<div class="cartao">
+  <h2>Arquivos de depuração</h2>
+  <p class="explicacao">
+    Quando um site do governo falha, o sistema salva um <strong>print da tela</strong> (.png)
+    e o <strong>HTML da página</strong> (.html) no momento do erro.
+    Se um site mudar de layout e o robô parar de funcionar, me mande esses dois
+    arquivos — é com eles que consigo descobrir o que mudou e corrigir.
+    <br>Pasta: <code>{{ pasta_debug }}</code>
+  </p>
+
+  {% if not arquivos_debug %}
+    <p class="sem-dados">Nenhum arquivo de depuração — sinal de que nada falhou ainda.</p>
+  {% else %}
+  <div class="rolagem">
+    <table>
+      <thead><tr><th>Arquivo</th><th>Quando</th><th>Tamanho</th><th class="centro">Abrir</th></tr></thead>
+      <tbody>
+        {% for a in arquivos_debug %}
+        <tr>
+          <td style="font-family:Consolas,monospace;font-size:12.5px">{{ a.nome }}</td>
+          <td class="linha-secundaria">{{ a.quando|data }}</td>
+          <td class="linha-secundaria">{{ a.tamanho_kb }} KB</td>
+          <td class="centro">
+            <a href="/logs/debug/arquivo/{{ a.nome }}" target="_blank"
+               class="botao pequeno secundario">Abrir</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

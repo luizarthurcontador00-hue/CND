@@ -1,0 +1,4 @@
+cnpj;razao_social;nome_fantasia;uf;municipio;inscricao_estadual;inscricao_municipal;regime_tributario;ativa;certidoes;observacoes
+11.222.333/0001-81;EXEMPLO COMERCIO DE ALIMENTOS LTDA;Mercado Exemplo;GO;Goiânia;10.123.456-7;123456;Simples Nacional;sim;FEDERAL,CNDT,FGTS,ESTADUAL_GO;Apague esta linha e coloque as suas empresas
+45.997.418/0001-53;MODELO SERVICOS CONTABEIS EIRELI;Modelo Serviços;GO;Anápolis;;987654;Lucro Presumido;sim;FEDERAL,CNDT,FGTS;Sem inscricao estadual, entao nao exige a estadual
+19.131.243/0001-97;TESTE INDUSTRIA E TRANSPORTES SA;Teste Transportes;GO;Aparecida de Goiânia;10.987.654-3;;Lucro Real;sim;FEDERAL,CNDT,FGTS,ESTADUAL_GO;

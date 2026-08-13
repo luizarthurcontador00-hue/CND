@@ -1,0 +1,30 @@
+# Banco de dados local
+*.db
+*.db-shm
+*.db-wal
+
+# PDFs das certidões emitidas (nunca versionar — são documentos de clientes)
+sistema_cnd/certidoes/*
+!sistema_cnd/certidoes/.gitkeep
+
+# Logs e prints de depuração
+sistema_cnd/logs/*
+!sistema_cnd/logs/.gitkeep
+!sistema_cnd/logs/debug/.gitkeep
+
+# Configuração com chaves reais (o config.yaml versionado é o modelo)
+config.local.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Sistema operacional / editores
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

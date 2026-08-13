@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block acoes_cabecalho %}
+  <div class="acoes">
+    {% if agendador_ativo and proxima_rodada %}
+      <span class="etiqueta azul">Próxima rodada automática: {{ proxima_rodada|data }}</span>
+    {% else %}
+      <span class="etiqueta">Agendamento desligado</span>
+    {% endif %}
+    <a href="/consultas" class="botao">Consultar agora</a>
+  </div>
+{% endblock %}
+
+{% block conteudo %}
+
+{# ------------------------------------------------------- contadores do topo #}
+<div class="contadores">
+  <a href="/" class="contador total {{ 'selecionado' if not filtro_cor }}">
+    <div class="numero">{{ contadores.total }}</div>
+    <div class="rotulo">Certidões acompanhadas</div>
+  </a>
+  <a href="/?cor=verde" class="contador verde {{ 'selecionado' if filtro_cor == 'verde' }}">
+    <div class="numero">{{ contadores.verde }}</div>
+    <div class="rotulo">Válidas</div>
+  </a>
+  <a href="/?cor=amarelo" class="contador amarelo {{ 'selecionado' if filtro_cor == 'amarelo' }}">
+    <div class="numero">{{ contadores.amarelo }}</div>
+    <div class="rotulo">Vencendo (até 15 dias)</div>
+  </a>
+  <a href="/?cor=vermelho" class="contador vermelho {{ 'selecionado' if filtro_cor == 'vermelho' }}">
+    <div class="numero">{{ contadores.vermelho }}</div>
+    <div class="rotulo">Vencidas ou positivas</div>
+  </a>
+  <a href="/?cor=cinza" class="contador cinza {{ 'selecionado' if filtro_cor == 'cinza' }}">
+    <div class="numero">{{ contadores.cinza }}</div>
+    <div class="rotulo">Com falha ou nunca consultadas</div>
+  </a>
+</div>
+
+{# ----------------------------------------------------------------- filtros #}
+<div class="cartao">
+  <form method="get" action="/" class="filtros">
+    <div style="flex:2">
+      <label>Empresa</label>
+      <input type="search" name="empresa" value="{{ filtro_empresa }}"
+             placeholder="Razão social, nome fantasia ou CNPJ">
+    </div>
+    <div>
+      <label>Certidão</label>
+      <select name="tipo">
+        <option value="">Todas</option>
+        {% for valor, rotulo in TIPOS %}
+          <option value="{{ valor }}" {{ 'selected' if filtro_tipo == valor }}>{{ rotulo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>Situação</label>
+      <select name="cor">
+        <option value="">Todas</option>
+        {% for c in CORES %}
+          <option value="{{ c }}" {{ 'selected' if filtro_cor == c }}>{{ ROTULO_COR[c] }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="min-width:auto">
+      <label class="caixa" style="border:none;padding:0;background:none">
+        <input type="checkbox" name="incluir_inativas" value="true" {{ 'checked' if incluir_inativas }}>
+        <span><strong style="font-weight:500;font-size:13px">Mostrar inativas</strong></span>
+      </label>
+    </div>
+    <div style="min-width:auto">
+      <button type="submit" class="botao secundario">Filtrar</button>
+      <a href="/" class="botao secundario">Limpar</a>
+    </div>
+  </form>
+</div>
+
+{# ----------------------------------------------------------------- tabela #}
+<div class="cartao">
+  {% if not linhas %}
+    <p class="sem-dados">
+      Nenhuma empresa encontrada com esses filtros.<br>
+      <a href="/empresas/nova">Cadastrar a primeira empresa</a> ou
+      <a href="/empresas">importar uma planilha</a>.
+    </p>
+  {% else %}
+  <div class="rolagem">
+    <table>
+      <thead>
+        <tr>
+          <th style="min-width:230px">Empresa</th>
+          {% for tipo in tipos_usados %}
+            <th class="centro">{{ ROTULOS_TIPO[tipo] }}</th>
+          {% endfor %}
+          <th class="centro">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for linha in linhas %}
+        <tr>
+          <td>
+            <div class="linha-principal">
+              {{ linha.empresa.apelido }}
+              {% if not linha.empresa.ativa %}<span class="etiqueta">inativa</span>{% endif %}
+            </div>
+            <div class="linha-secundaria">{{ linha.empresa.cnpj|cnpj }}</div>
+          </td>
+
+          {% for tipo in tipos_usados %}
+            {% set s = linha.situacao_de(tipo) %}
+            <td class="centro">
+              {% if s %}
+                {% if s.ultima_emissao and s.ultima_emissao.caminho_pdf %}
+                  <a href="/historico/{{ s.ultima_emissao.id }}/pdf" target="_blank"
+                     class="pastilha {{ s.cor }}" title="Abrir o PDF — {{ s.texto }}">
+                    <span class="principal">{{ ROTULO_CURTO[s.cor] }}</span>
+                    <span class="detalhe">{{ s.texto }}</span>
+                  </a>
+                {% else %}
+                  <span class="pastilha {{ s.cor }}" title="{{ s.motivo_bloqueio or s.texto }}">
+                    <span class="principal">{{ ROTULO_CURTO[s.cor] }}</span>
+                    <span class="detalhe">{{ s.texto }}</span>
+                  </span>
+                {% endif %}
+              {% else %}
+                <span class="pastilha vazio" title="Esta empresa não exige esta certidão">não exige</span>
+              {% endif %}
+            </td>
+          {% endfor %}
+
+          <td class="centro">
+            <form method="post" action="/consultas/executar" style="display:inline">
+              <input type="hidden" name="empresa_ids" value="{{ linha.empresa.id }}">
+              <button type="submit" class="botao pequeno secundario"
+                      {{ 'disabled' if rodada_ativa }}>Consultar</button>
+            </form>
+            <a href="/empresas/{{ linha.empresa.id }}/editar" class="botao pequeno secundario">Editar</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="explicacao" style="margin:14px 0 0">
+    <strong>Como ler:</strong>
+    <span class="etiqueta verde">Válida</span> em dia &nbsp;
+    <span class="etiqueta amarelo">Vencendo</span> vence em até 15 dias &nbsp;
+    <span class="etiqueta vermelho">Atenção</span> vencida ou positiva — precisa de ação &nbsp;
+    <span class="etiqueta">Sem certidão</span> nunca consultada ou o robô falhou.
+    Clique na pastilha para abrir o PDF.
+  </p>
+  {% endif %}
+</div>
+
+{% endblock %}

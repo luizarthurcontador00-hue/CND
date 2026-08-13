@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block acoes_cabecalho %}
+  <div class="acoes">
+    <a href="/empresas/modelo-csv" class="botao secundario">Baixar modelo de planilha</a>
+    <a href="/empresas/nova" class="botao">+ Nova empresa</a>
+  </div>
+{% endblock %}
+
+{% block conteudo %}
+
+{# ------------------------------------------------------------- importação #}
+<details class="cartao blocao">
+  <summary>Importar várias empresas de uma vez (CSV ou Excel)</summary>
+  <p class="explicacao" style="margin-top:10px">
+    Baixe o modelo, preencha no Excel e envie aqui. Empresa cujo CNPJ já existe é
+    <strong>atualizada</strong>, nunca duplicada. A coluna <code>certidoes</code> aceita os
+    valores separados por vírgula: FEDERAL, CNDT, FGTS, ESTADUAL_GO, MUNICIPAL.
+    Se deixar essa coluna em branco, o sistema sugere sozinho (Federal, CNDT e FGTS,
+    mais a estadual quando houver inscrição estadual em GO).
+  </p>
+  <form method="post" action="/empresas/importar" enctype="multipart/form-data" class="acoes">
+    <input type="file" name="arquivo" accept=".csv,.xlsx,.xlsm" required style="max-width:420px">
+    <button type="submit" class="botao">Importar</button>
+  </form>
+</details>
+
+{# ------------------------------------------------------------------ busca #}
+<div class="cartao">
+  <form method="get" action="/empresas" class="filtros">
+    <div style="flex:1">
+      <label>Buscar</label>
+      <input type="search" name="busca" value="{{ busca }}"
+             placeholder="Razão social, nome fantasia ou CNPJ">
+    </div>
+    <div style="min-width:auto">
+      <button type="submit" class="botao secundario">Buscar</button>
+      <a href="/empresas" class="botao secundario">Limpar</a>
+    </div>
+  </form>
+</div>
+
+{# ----------------------------------------------------------------- tabela #}
+<div class="cartao">
+  <h2>{{ empresas|length }} empresa(s) cadastrada(s)</h2>
+
+  {% if not empresas %}
+    <p class="sem-dados">
+      Nenhuma empresa cadastrada ainda.<br>
+      <a href="/empresas/nova">Cadastrar a primeira</a> ou importar a planilha acima.
+    </p>
+  {% else %}
+  <div class="rolagem">
+    <table>
+      <thead>
+        <tr>
+          <th>Empresa</th>
+          <th>CNPJ</th>
+          <th>UF / Município</th>
+          <th>IE / IM</th>
+          <th>Regime</th>
+          <th>Certidões exigidas</th>
+          <th class="centro">Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in empresas %}
+        <tr>
+          <td>
+            <div class="linha-principal">
+              {{ e.apelido }}
+              {% if not e.ativa %}<span class="etiqueta">inativa</span>{% endif %}
+              {% if not e.e_matriz %}<span class="etiqueta azul" title="CNPJ de filial">filial</span>{% endif %}
+            </div>
+            {% if e.nome_fantasia %}<div class="linha-secundaria">{{ e.razao_social }}</div>{% endif %}
+          </td>
+          <td>{{ e.cnpj|cnpj }}</td>
+          <td>{{ e.uf or '—' }}{% if e.municipio %} / {{ e.municipio }}{% endif %}</td>
+          <td class="linha-secundaria">
+            IE: {{ e.inscricao_estadual or '—' }}<br>
+            IM: {{ e.inscricao_municipal or '—' }}
+          </td>
+          <td>{{ e.regime_tributario or '—' }}</td>
+          <td>
+            {% for tipo in e.tipos_exigidos() %}
+              <span class="etiqueta azul">{{ ROTULOS_TIPO[tipo.value] }}</span>
+            {% else %}
+              <span class="linha-secundaria">nenhuma</span>
+            {% endfor %}
+          </td>
+          <td class="centro" style="white-space:nowrap">
+            <a href="/empresas/{{ e.id }}/editar" class="botao pequeno secundario">Editar</a>
+            <form method="post" action="/empresas/{{ e.id }}/excluir" style="display:inline"
+                  data-confirmar="Excluir {{ e.razao_social }} e todo o histórico de emissões dela? Os PDFs continuam na pasta de certidões.">
+              <button type="submit" class="botao pequeno perigo">Excluir</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

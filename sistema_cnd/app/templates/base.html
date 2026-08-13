@@ -1,0 +1,61 @@
+{# Molde de todas as telas. Mexer aqui muda o cabeçalho/rodapé de todas. #}
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ titulo }} — Sistema de CNDs</title>
+  <link rel="stylesheet" href="/static/estilo.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📄</text></svg>">
+</head>
+<body>
+
+<header class="topo">
+  <div class="marca">
+    <span class="logo">📄</span>
+    <div>
+      <strong>Sistema de CNDs</strong>
+      <small>Controle e emissão de certidões</small>
+    </div>
+  </div>
+
+  <nav class="menu">
+    <a href="/"          class="{{ 'ativo' if titulo == 'Painel' }}">Painel</a>
+    <a href="/empresas"  class="{{ 'ativo' if 'Empresa' in titulo or titulo == 'Empresas' }}">Empresas</a>
+    <a href="/consultas" class="{{ 'ativo' if titulo == 'Consultas' }}">Consultas</a>
+    <a href="/historico" class="{{ 'ativo' if titulo == 'Histórico' }}">Histórico</a>
+    <a href="/logs"      class="{{ 'ativo' if titulo == 'Logs' or 'Execução' in titulo }}">Logs</a>
+  </nav>
+
+  {% if rodada_ativa %}
+  <a href="/consultas" class="pisca-consulta" title="Há uma consulta rodando agora">
+    <span class="ponto"></span> consultando…
+  </a>
+  {% endif %}
+</header>
+
+<main>
+  <div class="cabecalho-pagina">
+    <h1>{{ titulo }}</h1>
+    {% block acoes_cabecalho %}{% endblock %}
+  </div>
+
+  {% if mensagem %}
+  <div class="aviso aviso-{{ tipo_mensagem }}">
+    <span>{{ mensagem }}</span>
+    <button type="button" class="fechar" onclick="this.parentElement.remove()">✕</button>
+  </div>
+  {% endif %}
+
+  {% block conteudo %}{% endblock %}
+</main>
+
+<footer class="rodape">
+  <span>Sistema de CNDs v{{ versao }} — roda só na sua máquina, nada é enviado para fora.</span>
+  <a href="/sobre">Sobre / diagnóstico</a>
+</footer>
+
+<script src="/static/app.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

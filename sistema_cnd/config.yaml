@@ -1,0 +1,225 @@
+# =============================================================================
+#  SISTEMA DE CONTROLE E EMISSÃO DE CNDs — ARQUIVO DE CONFIGURAÇÃO
+# =============================================================================
+#  Este é o único arquivo que você precisa editar no dia a dia.
+#  Regras para não quebrar nada:
+#    - Não apague os dois-pontos ":" nem mude os espaços do começo da linha.
+#    - Textos com barras ou dois-pontos vão entre aspas: "C:\Pasta\Certidoes"
+#    - true = ligado / sim      |      false = desligado / não
+#    - Linhas começando com "#" são comentários, o programa ignora.
+#  Depois de editar, feche e abra o programa de novo para valer.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1) SERVIDOR — onde a tela do sistema abre no navegador
+# -----------------------------------------------------------------------------
+servidor:
+  # Endereço em que o programa escuta.
+  #   127.0.0.1 = só esta máquina consegue abrir (mais seguro, é o normal).
+  #   0.0.0.0   = outros computadores da rede também conseguem abrir.
+  host: "127.0.0.1"
+
+  # Porta. Se der erro "porta em uso", troque para 8001, 8080, etc.
+  porta: 8000
+
+  # Abrir o navegador sozinho quando o programa iniciar?
+  abrir_navegador_ao_iniciar: true
+
+
+# -----------------------------------------------------------------------------
+# 2) ARMAZENAMENTO — onde ficam os PDFs, o banco e os logs
+# -----------------------------------------------------------------------------
+armazenamento:
+  # Pasta raiz onde os PDFs das certidões são salvos.
+  # Dentro dela o programa cria:  {CNPJ}/{AAAA-MM}/{TIPO}_{AAAAMMDD}.pdf
+  # Pode ser caminho relativo (dentro da pasta do programa) ou absoluto.
+  # Para usar uma pasta de rede, escreva assim:
+  #   pasta_certidoes: "\\\\SERVIDOR\\Contabil\\Certidoes"
+  #   pasta_certidoes: "C:\\Users\\Fulano\\Dropbox\\Certidoes"
+  pasta_certidoes: "certidoes"
+
+  # Pasta de logs e dos prints de tela de depuração (logs/debug).
+  pasta_logs: "logs"
+
+  # Arquivo do banco de dados (um arquivo só, sem instalar nada).
+  # FAÇA CÓPIA DESTE ARQUIVO DE VEZ EM QUANDO — é aqui que fica todo o cadastro.
+  banco_dados: "banco.db"
+
+  # Criar 3 empresas de exemplo na primeira execução, para você ver o sistema
+  # funcionando antes de cadastrar as suas. Depois de cadastrar as reais,
+  # mude para false.
+  criar_dados_exemplo: true
+
+
+# -----------------------------------------------------------------------------
+# 3) NAVEGADOR — como o robô acessa os sites do governo
+# -----------------------------------------------------------------------------
+navegador:
+  # true  = navegador invisível, roda em segundo plano (use no dia a dia).
+  # false = abre a janela do navegador na sua frente.
+  #         Use quando um site mudar de layout e você quiser ver o que acontece.
+  headless: true
+
+  # Tempo máximo (em milissegundos) esperando uma página responder.
+  # 60000 = 60 segundos. Sites de governo são lentos; não abaixe muito.
+  timeout_ms: 60000
+
+  # Atraso artificial entre cada clique, em milissegundos.
+  # Deixe 0 no dia a dia. Coloque 500 junto com headless:false para conseguir
+  # acompanhar o robô com os olhos enquanto ele trabalha.
+  camera_lenta_ms: 0
+
+  # Como o navegador se identifica nos sites. Só mexa se eu pedir.
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+
+# -----------------------------------------------------------------------------
+# 4) CAPTCHA — aquele "prove que você não é um robô"
+# -----------------------------------------------------------------------------
+# A Receita Federal e a Caixa (FGTS) usam captcha. Sem um serviço pago que
+# resolva isso, essas duas certidões NÃO saem sozinhas.
+#
+# O sistema NUNCA para por causa disso: quando não consegue resolver o captcha,
+# ele grava a tentativa com o status CAPTCHA_FALHOU e você emite manualmente
+# pela tela "Histórico" (botão de upload do PDF).
+#
+# Se um dia quiser automatizar 100%, crie conta em 2captcha.com ou
+# anti-captcha.com, coloque créditos, e preencha aqui embaixo.
+# -----------------------------------------------------------------------------
+captcha:
+  # Opções: "nenhum" (padrão), "2captcha" ou "anticaptcha"
+  provedor: "nenhum"
+
+  # Cole aqui a chave da sua conta quando tiver. Deixe "" enquanto não tiver.
+  chave_api: ""
+
+  # Tempo máximo (segundos) esperando o serviço devolver a resposta do captcha.
+  timeout_segundos: 180
+
+
+# -----------------------------------------------------------------------------
+# 5) AGENDAMENTO — a rotina que roda sozinha
+# -----------------------------------------------------------------------------
+# O programa NÃO sai emitindo tudo todo dia. Ele olha o que está perto de
+# vencer e emite só o necessário — isso evita sobrecarregar os sites do
+# governo e tomar bloqueio de IP.
+# -----------------------------------------------------------------------------
+agendamento:
+  # Ligar a rotina automática? (false = só emite quando você clicar no botão)
+  ativo: true
+
+  # Horário da rodada diária, formato 24h "HH:MM".
+  # Prefira fora do horário comercial: os sites ficam mais rápidos.
+  hora_execucao: "06:00"
+
+  # Rodar também aos sábados e domingos?
+  incluir_fim_de_semana: false
+
+  # Fuso horário. Deixe em branco ("") para usar o relógio do próprio
+  # computador — é quase sempre o que você quer. Só preencha (ex:
+  # "America/Sao_Paulo") se a máquina estiver com o relógio em outro fuso.
+  fuso_horario: ""
+
+  # A partir de quantos dias antes do vencimento o robô tenta renovar.
+  # ATENÇÃO: cada certidão tem sua própria janela, definida lá embaixo em
+  # "certidoes". Este valor aqui é só o padrão de quem não tiver o seu.
+  dias_antes_para_renovar: 30
+
+  # Quantos dias antes do vencimento o painel pinta de AMARELO ("vencendo").
+  dias_alerta_amarelo: 15
+
+
+# -----------------------------------------------------------------------------
+# 6) EDUCAÇÃO COM OS SITES — para não derrubar o servidor nem tomar bloqueio
+# -----------------------------------------------------------------------------
+execucao:
+  # Espera aleatória entre uma consulta e outra NO MESMO SITE (segundos).
+  # O robô sorteia um valor entre os dois — parece mais com uma pessoa usando.
+  intervalo_minimo_segundos: 3
+  intervalo_maximo_segundos: 8
+
+  # Quantas vezes tentar de novo quando uma certidão falha.
+  tentativas_maximas: 3
+
+  # Espera antes de cada nova tentativa (segundos). A lista tem que ter, no
+  # mínimo, "tentativas_maximas - 1" itens. Ex: 30s, depois 120s, depois 300s.
+  espera_entre_tentativas_segundos: [30, 120, 300]
+
+  # Quantas empresas processar ao mesmo tempo. DEIXE 1.
+  # Sites de governo não gostam de várias consultas simultâneas do mesmo IP.
+  paralelismo: 1
+
+
+# -----------------------------------------------------------------------------
+# 7) CERTIDÕES — quais o sistema conhece e as regras de cada uma
+# -----------------------------------------------------------------------------
+# IMPORTANTE: "validade_padrao_dias" é só um PLANO B.
+# O sistema sempre tenta ler a data de validade de dentro do PDF emitido.
+# O número fixo só é usado quando a leitura do PDF falha.
+#
+# "janela_renovacao_dias" = a partir de quantos dias antes do vencimento o
+# site aceita emitir a nova. Antes disso o robô nem tenta (o site recusaria).
+# -----------------------------------------------------------------------------
+certidoes:
+
+  FEDERAL:
+    nome: "Federal — Receita Federal / PGFN (conjunta, inclui INSS)"
+    ativo: true
+    validade_padrao_dias: 180
+    janela_renovacao_dias: 30
+    tem_captcha: true
+    usa_cnpj_matriz: true    # emitida pelo CNPJ da matriz, vale para as filiais
+
+  CNDT:
+    nome: "Trabalhista — CNDT / TST"
+    ativo: true
+    validade_padrao_dias: 180
+    janela_renovacao_dias: 30
+    tem_captcha: false
+
+  FGTS:
+    nome: "FGTS — CRF / Caixa Econômica"
+    ativo: true
+    validade_padrao_dias: 30
+    # REGRA LEGAL: o CRF só pode ser renovado a partir do 10º dia anterior ao
+    # vencimento. Tentar antes disso é recusado pelo site. NÃO aumente este
+    # número achando que vai renovar mais cedo — vai só gerar erro.
+    janela_renovacao_dias: 10
+    tem_captcha: true
+
+  ESTADUAL_GO:
+    nome: "Estadual — SEFAZ Goiás"
+    ativo: true
+    validade_padrao_dias: 60
+    janela_renovacao_dias: 15
+    tem_captcha: false
+    # Tenta primeiro por requisição direta (rápido). Se falhar, cai para o
+    # navegador automatizado. Deixe true.
+    tentar_sem_navegador: true
+    # A opção "para fins de espólio" do site. Deixe sempre false.
+    fins_espolio: false
+
+  MUNICIPAL:
+    nome: "Municipal — (prefeitura ainda a definir)"
+    # Deixe false até me informar qual prefeitura e eu preencher o robô.
+    ativo: false
+    validade_padrao_dias: 90
+    janela_renovacao_dias: 15
+    tem_captcha: false
+
+
+# -----------------------------------------------------------------------------
+# 8) REGISTRO DE ATIVIDADE
+# -----------------------------------------------------------------------------
+log:
+  # Detalhamento das mensagens: "DEBUG" (tudo), "INFO" (normal), "WARNING" (só problemas)
+  nivel: "INFO"
+
+  # Salvar print da tela + HTML da página quando um site falhar?
+  # Deixe true: é isso que me permite descobrir o que mudou no site.
+  salvar_debug_em_erro: true
+
+  # Apagar automaticamente arquivos de depuração com mais de X dias
+  # (senão a pasta logs/debug cresce sem parar). 0 = nunca apagar.
+  apagar_debug_apos_dias: 30

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block acoes_cabecalho %}
+  <a href="/logs" class="botao secundario">← Voltar aos logs</a>
+{% endblock %}
+
+{% block conteudo %}
+
+<div class="contadores">
+  <div class="contador total">
+    <div class="numero">{{ execucao.total_consultas }}</div>
+    <div class="rotulo">Consultas tentadas</div>
+  </div>
+  <div class="contador verde">
+    <div class="numero">{{ execucao.total_sucesso }}</div>
+    <div class="rotulo">Emitidas com sucesso</div>
+  </div>
+  <div class="contador vermelho">
+    <div class="numero">{{ execucao.total_falha }}</div>
+    <div class="rotulo">Falhas</div>
+  </div>
+  <div class="contador cinza">
+    <div class="numero">{{ execucao.total_pulado }}</div>
+    <div class="rotulo">Puladas (ainda válidas)</div>
+  </div>
+</div>
+
+<div class="cartao">
+  <ul class="lista-info">
+    <li><span>Início</span><span>{{ execucao.inicio|data }}</span></li>
+    <li><span>Fim</span><span>{{ execucao.fim|data }}</span></li>
+    <li><span>Duração</span><span>
+      {% if execucao.em_andamento %}em andamento
+      {% else %}{{ '%.0f'|format(execucao.duracao_segundos or 0) }} segundos{% endif %}
+    </span></li>
+    <li><span>Tipo</span><span>{{ 'Automática (agendador)' if execucao.tipo == 'AGENDADA' else 'Manual (você clicou)' }}</span></li>
+  </ul>
+</div>
+
+<div class="cartao">
+  <h2>Resultado por empresa e certidão</h2>
+  {% if not execucao.itens %}
+    <p class="sem-dados">Sem itens registrados nesta execução.</p>
+  {% else %}
+  <div class="rolagem">
+    <table>
+      <thead>
+        <tr><th>Empresa</th><th>Certidão</th><th>Resultado</th><th>Mensagem</th>
+            <th class="centro">Tentativas</th><th class="centro">Tempo</th></tr>
+      </thead>
+      <tbody>
+        {% for item in execucao.itens %}
+        <tr>
+          <td>
+            {{ item.empresa_nome or '—' }}
+            <div class="linha-secundaria">{{ item.cnpj|cnpj }}</div>
+          </td>
+          <td>{{ ROTULOS_TIPO.get(item.tipo_certidao, item.tipo_certidao) }}</td>
+          <td>
+            {% if item.status in ['NEGATIVA', 'POSITIVA_COM_EFEITO_NEGATIVA'] %}
+              <span class="etiqueta verde">{{ ROTULOS_STATUS.get(item.status, item.status) }}</span>
+            {% elif item.status == 'PULADA' %}
+              <span class="etiqueta">Pulada</span>
+            {% elif item.status == 'CAPTCHA_FALHOU' %}
+              <span class="etiqueta amarelo">{{ ROTULOS_STATUS[item.status] }}</span>
+            {% else %}
+              <span class="etiqueta vermelho">{{ ROTULOS_STATUS.get(item.status, item.status) }}</span>
+            {% endif %}
+          </td>
+          <td class="linha-secundaria">{{ item.mensagem or '—' }}</td>
+          <td class="centro linha-secundaria">{{ item.tentativas }}</td>
+          <td class="centro linha-secundaria">
+            {{ '%.1f'|format(item.duracao_segundos) if item.duracao_segundos else '—' }}{{ 's' if item.duracao_segundos }}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

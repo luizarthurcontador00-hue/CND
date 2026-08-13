@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+
+{% if not captcha_disponivel %}
+<div class="aviso aviso-info">
+  <span>
+    <strong>Modo manual de captcha.</strong>
+    Nenhum serviço de resolução de captcha está configurado, então
+    <strong>Federal</strong> e <strong>FGTS</strong> vão registrar
+    “Captcha não resolvido”. As demais saem normalmente. Quando isso acontecer,
+    emita a certidão no site e anexe o PDF pela tela de
+    <a href="/historico">Histórico</a> — o controle de validade continua completo.
+  </span>
+</div>
+{% endif %}
+
+{# ------------------------------------------------------------- progresso #}
+<div class="cartao {{ '' if rodada_ativa else 'oculto' }}" id="painel-progresso">
+  <h2>Consulta em andamento</h2>
+  <div class="barra"><div class="preenchida" id="barra-progresso" style="width:4%">0%</div></div>
+  <p id="rotulo-progresso" class="explicacao">Iniciando…</p>
+  <div class="lista-progresso" id="lista-progresso"></div>
+</div>
+
+{# ---------------------------------------------------------------- disparo #}
+<form method="post" action="/consultas/executar" class="cartao">
+  <h2>Consultar agora</h2>
+  <p class="explicacao">
+    Sem escolher nada, o sistema emite <strong>só o que está dentro da janela de renovação</strong>
+    de cada certidão — é o comportamento recomendado. Marque empresas específicas para
+    consultar só elas.
+  </p>
+
+  <div class="grade-2" style="margin-bottom:14px">
+    <div>
+      <label>Certidões <span class="opcional">(vazio = todas as exigidas)</span></label>
+      <div class="caixas" style="grid-template-columns:1fr">
+        {% for valor, rotulo in TIPOS %}
+        <label class="caixa" style="padding:7px 10px">
+          <input type="checkbox" name="tipos" value="{{ valor }}">
+          <span><strong style="font-size:13px">{{ rotulo }}</strong></span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <label>Empresas <span class="opcional">(vazio = todas as ativas)</span></label>
+      <div class="acoes" style="margin-bottom:6px">
+        <button type="button" class="botao pequeno secundario"
+                onclick="marcarTodas('input[name=empresa_ids]', true)">Marcar todas</button>
+        <button type="button" class="botao pequeno secundario"
+                onclick="marcarTodas('input[name=empresa_ids]', false)">Desmarcar</button>
+      </div>
+      <div class="lista-progresso" style="max-height:260px;border:1px solid var(--borda);border-radius:6px">
+        {% for e in empresas %}
+        <div>
+          <label style="display:flex;gap:8px;font-weight:400;margin:0">
+            <input type="checkbox" name="empresa_ids" value="{{ e.id }}">
+            <span>{{ e.apelido }} <span class="linha-secundaria">{{ e.cnpj|cnpj }}</span></span>
+          </label>
+        </div>
+        {% else %}
+        <div class="linha-secundaria">Nenhuma empresa ativa cadastrada.</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <label class="caixa" style="max-width:520px">
+    <input type="checkbox" name="forcar" value="true">
+    <span>
+      <strong>Ignorar a janela de renovação (forçar)</strong>
+      <small>
+        Emite mesmo quem ainda está válido com folga. Use só quando precisar de uma
+        certidão na hora — o FGTS, por exemplo, é recusado pelo site fora dos 10 dias finais.
+      </small>
+    </span>
+  </label>
+
+  <div class="acoes" style="margin-top:14px">
+    <button type="submit" class="botao" id="botao-consultar" {{ 'disabled' if rodada_ativa }}>
+      Iniciar consulta
+    </button>
+    <span class="explicacao" style="margin:0">
+      Intervalo de 3 a 8 segundos entre consultas ao mesmo site, até 3 tentativas por certidão.
+    </span>
+  </div>
+</form>
+
+{# ----------------------------------------------------------- o que sairia #}
+<div class="cartao">
+  <h2>Se você iniciar agora, o sistema vai emitir {{ a_emitir|length }} certidão(ões)</h2>
+
+  {% if a_emitir %}
+  <div class="rolagem">
+    <table>
+      <thead><tr><th>Empresa</th><th>Certidão</th><th>Por quê</th></tr></thead>
+      <tbody>
+        {% for p in a_emitir %}
+        <tr>
+          <td>{{ p.empresa.apelido }} <span class="linha-secundaria">{{ p.empresa.cnpj|cnpj }}</span></td>
+          <td>{{ ROTULOS_TIPO[p.tipo] }}</td>
+          <td class="linha-secundaria">{{ p.motivo }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="sem-dados">
+    Nada a emitir no momento — está tudo dentro da validade.<br>
+    Marque “forçar” acima se quiser emitir assim mesmo.
+  </p>
+  {% endif %}
+</div>
+
+{% if puladas %}
+<details class="cartao blocao">
+  <summary>{{ puladas|length }} certidão(ões) que o sistema vai pular (e o motivo)</summary>
+  <div class="rolagem" style="margin-top:10px">
+    <table>
+      <thead><tr><th>Empresa</th><th>Certidão</th><th>Motivo</th></tr></thead>
+      <tbody>
+        {% for p in puladas %}
+        <tr>
+          <td>{{ p.empresa.apelido }}</td>
+          <td>{{ ROTULOS_TIPO[p.tipo] }}</td>
+          <td class="linha-secundaria">{{ p.motivo }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endif %}
+
+{% endblock %}

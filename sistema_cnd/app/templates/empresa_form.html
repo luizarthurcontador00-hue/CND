@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+
+<form method="post" action="/empresas/salvar" class="cartao formulario">
+  {% if empresa %}<input type="hidden" name="empresa_id" value="{{ empresa.id }}">{% endif %}
+
+  <h2>Dados da empresa</h2>
+
+  <div class="grade-2">
+    <div>
+      <label>CNPJ *</label>
+      <input type="text" name="cnpj" data-mascara="cnpj" required
+             value="{{ empresa.cnpj_formatado if empresa else '' }}"
+             placeholder="00.000.000/0000-00">
+      <div class="dica">Pode digitar com ou sem pontuação. O sistema confere se é válido.</div>
+    </div>
+    <div>
+      <label>Razão social *</label>
+      <input type="text" name="razao_social" required
+             value="{{ empresa.razao_social if empresa else '' }}">
+    </div>
+    <div>
+      <label>Nome fantasia <span class="opcional">(opcional)</span></label>
+      <input type="text" name="nome_fantasia" value="{{ empresa.nome_fantasia or '' if empresa else '' }}">
+      <div class="dica">É o nome que aparece no painel, quando preenchido.</div>
+    </div>
+    <div>
+      <label>Regime tributário <span class="opcional">(opcional)</span></label>
+      <select name="regime_tributario">
+        {% set atual = empresa.regime_tributario if empresa else '' %}
+        <option value="">—</option>
+        {% for r in ['Simples Nacional', 'MEI', 'Lucro Presumido', 'Lucro Real', 'Imune / Isenta'] %}
+          <option value="{{ r }}" {{ 'selected' if atual == r }}>{{ r }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label>UF</label>
+      <input type="text" name="uf" maxlength="2" style="text-transform:uppercase"
+             value="{{ empresa.uf or '' if empresa else 'GO' }}">
+    </div>
+    <div>
+      <label>Município</label>
+      <input type="text" name="municipio" value="{{ empresa.municipio or '' if empresa else '' }}">
+    </div>
+    <div>
+      <label>Inscrição estadual <span class="opcional">(deixe em branco se não tiver)</span></label>
+      <input type="text" name="inscricao_estadual"
+             value="{{ empresa.inscricao_estadual or '' if empresa else '' }}">
+      <div class="dica">Sem inscrição estadual, a certidão estadual normalmente não se aplica.</div>
+    </div>
+    <div>
+      <label>Inscrição municipal <span class="opcional">(opcional)</span></label>
+      <input type="text" name="inscricao_municipal"
+             value="{{ empresa.inscricao_municipal or '' if empresa else '' }}">
+    </div>
+  </div>
+
+  <div>
+    <label>Observações <span class="opcional">(opcional)</span></label>
+    <textarea name="observacoes">{{ empresa.observacoes or '' if empresa else '' }}</textarea>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--borda)">
+
+  <h2 style="border:none;padding:0">Quais certidões esta empresa exige?</h2>
+  <p class="explicacao">
+    Marque só o que se aplica. O robô nunca tenta emitir o que não está marcado —
+    isso evita consultas inúteis e bloqueio nos sites do governo.
+  </p>
+
+  <div class="caixas">
+    {% for valor, rotulo in TIPOS %}
+    <label class="caixa">
+      <input type="checkbox" name="certidoes" value="{{ valor }}"
+             {{ 'checked' if valor in exigencias }}>
+      <span>
+        <strong>{{ rotulo }}</strong>
+        <small>
+          {% if valor == 'FEDERAL' %}Conjunta RFB/PGFN, inclui INSS. Validade 180 dias. Emitida pelo CNPJ da matriz.
+          {% elif valor == 'CNDT' %}Débitos trabalhistas (TST). Validade 180 dias. Emissão automática.
+          {% elif valor == 'FGTS' %}CRF da Caixa. Validade 30 dias, só renova nos 10 dias finais.
+          {% elif valor == 'ESTADUAL_GO' %}SEFAZ Goiás. Só faz sentido com inscrição estadual em GO.
+          {% elif valor == 'MUNICIPAL' %}Prefeitura ainda a definir — deixe desmarcado por enquanto.
+          {% endif %}
+        </small>
+      </span>
+    </label>
+    {% endfor %}
+  </div>
+
+  <label class="caixa" style="max-width:340px">
+    <input type="checkbox" name="ativa" value="true" {{ 'checked' if (not empresa) or empresa.ativa }}>
+    <span>
+      <strong>Empresa ativa</strong>
+      <small>Desmarque para parar de emitir certidões sem perder o histórico.</small>
+    </span>
+  </label>
+
+  <div class="acoes">
+    <button type="submit" class="botao">{{ 'Salvar alterações' if empresa else 'Cadastrar empresa' }}</button>
+    <a href="/empresas" class="botao secundario">Cancelar</a>
+  </div>
+</form>
+
+{% endblock %}

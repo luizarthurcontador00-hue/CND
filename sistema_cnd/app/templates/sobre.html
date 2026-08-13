@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block conteudo %}
+
+<div class="cartao">
+  <h2>Situação do sistema</h2>
+  <p class="explicacao">
+    Se algo não estiver funcionando, mande esta tela junto com o problema — ela
+    responde a maior parte das perguntas de diagnóstico.
+  </p>
+  <ul class="lista-info">
+    {% for chave, valor in info.items() %}
+      <li><span>{{ chave }}</span><span>{{ valor }}</span></li>
+    {% endfor %}
+  </ul>
+</div>
+
+<div class="cartao">
+  <h2>Perguntas frequentes</h2>
+
+  <details class="blocao">
+    <summary>Por que a Federal e o FGTS aparecem como “Captcha não resolvido”?</summary>
+    <p class="explicacao">
+      Esses dois sites exigem resolver um captcha. Sem um serviço pago de resolução
+      configurado no <code>config.yaml</code>, o robô não consegue passar dessa etapa.
+      Emita a certidão à mão no site e anexe o PDF pela tela de
+      <a href="/historico">Histórico</a> — o controle de validade segue funcionando igual.
+    </p>
+  </details>
+
+  <details class="blocao">
+    <summary>Por que o sistema não emite todas as certidões todo dia?</summary>
+    <p class="explicacao">
+      Porque isso sobrecarrega os sites do governo e pode gerar bloqueio do seu IP.
+      O robô só emite o que está dentro da janela de renovação. O FGTS, por exemplo,
+      só pode ser renovado a partir do 10º dia anterior ao vencimento — tentar antes
+      disso é recusado pelo próprio site.
+    </p>
+  </details>
+
+  <details class="blocao">
+    <summary>Um site do governo mudou e o robô parou. E agora?</summary>
+    <p class="explicacao">
+      Vá em <a href="/logs">Logs</a>, baixe o print (.png) e o HTML (.html) da falha e me envie.
+      Cada site é um arquivo separado dentro da pasta <code>robos/</code>, então dá para
+      consertar um sem mexer nos outros. Para ver o robô trabalhando na tela, mude
+      <code>navegador.headless</code> para <code>false</code> no <code>config.yaml</code>.
+    </p>
+  </details>
+
+  <details class="blocao">
+    <summary>Como faço backup?</summary>
+    <p class="explicacao">
+      Copie dois lugares: o arquivo <code>banco.db</code> (todo o cadastro e histórico)
+      e a pasta de certidões (os PDFs). Nada mais é necessário — o sistema não guarda
+      dados fora da própria pasta e não envia nada para a internet além das consultas
+      aos sites oficiais.
+    </p>
+  </details>
+
+  <details class="blocao">
+    <summary>Como mudo a pasta onde os PDFs são salvos?</summary>
+    <p class="explicacao">
+      No <code>config.yaml</code>, em <code>armazenamento.pasta_certidoes</code>.
+      Pode ser uma pasta de rede, escrita assim:
+      <code>"\\\\SERVIDOR\\Contabil\\Certidoes"</code>. Feche e abra o programa depois de mudar.
+    </p>
+  </details>
+</div>
+
+{% endblock %}
