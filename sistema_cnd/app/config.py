@@ -31,6 +31,7 @@ PADROES: dict[str, Any] = {
         "pasta_certidoes": "certidoes",
         "pasta_logs": "logs",
         "banco_dados": "banco.db",
+        "pasta_dados": "dados",
         "criar_dados_exemplo": True,
     },
     "navegador": {
@@ -144,11 +145,25 @@ class Config:
         return self.pasta_logs / "debug"
 
     @property
+    def pasta_dados(self) -> Path:
+        """Onde o sistema guarda o que aprende sozinho (modelos de captcha)."""
+        return self._resolver(self._dados["armazenamento"].get("pasta_dados", "dados"))
+
+    @property
+    def arquivo_modelos_captcha(self) -> Path:
+        return self.pasta_dados / "modelos_captcha_cndt.json"
+
+    @property
     def arquivo_banco(self) -> Path:
         return self._resolver(self._dados["armazenamento"]["banco_dados"])
 
     def criar_pastas(self) -> None:
-        for pasta in (self.pasta_certidoes, self.pasta_logs, self.pasta_debug):
+        for pasta in (
+            self.pasta_certidoes,
+            self.pasta_logs,
+            self.pasta_debug,
+            self.pasta_dados,
+        ):
             pasta.mkdir(parents=True, exist_ok=True)
 
     # ------------------------------------------------------------------ captcha

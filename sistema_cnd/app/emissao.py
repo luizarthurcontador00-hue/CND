@@ -127,6 +127,7 @@ def montar_contexto(empresa: Empresa, tipo: str, emissao_anterior: Emissao | Non
         "regras": config.certidao(tipo),
         "pasta_certidoes": config.pasta_certidoes,
         "pasta_debug": config.pasta_debug,
+        "arquivo_modelos_captcha": config.arquivo_modelos_captcha,
         "headless": config.navegador.get("headless", True),
         "captcha_disponivel": config.captcha_disponivel,
         "empresa": {

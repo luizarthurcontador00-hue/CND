@@ -128,11 +128,20 @@ Colunas da planilha:
 Isso é esperado em duas situações:
 
 **a) Captcha (Federal e FGTS).**
-Esses dois sites exigem resolver um captcha. Enquanto não houver um serviço pago
-de resolução configurado, o robô registra "Captcha não resolvido".
+Esses dois sites exigem resolver um captcha difícil (hCaptcha e similar).
+Enquanto não houver um serviço pago de resolução configurado, o robô registra
+"Captcha não resolvido".
 **O sistema não trava por isso.** Emita a certidão à mão no site e anexe o PDF em
 **Histórico → "Anexar PDF emitido à mão"**. O sistema lê a validade de dentro do
 PDF e o painel volta a ficar verde.
+
+> **O captcha do CNDT (TST) é resolvido sozinho, de graça.** Ele é bem mais
+> simples que os outros — 6 letras em posições fixas — e o sistema lê a imagem
+> na própria máquina, sem enviar nada para fora e sem serviço pago.
+> Melhor ainda: **o sistema aprende com o uso.** Toda vez que uma emissão dá
+> certo, ele guarda os caracteres daquele captcha e passa a ler melhor. Nas
+> primeiras semanas ele pode precisar de duas ou três tentativas por certidão;
+> depois erra cada vez menos.
 
 **b) O site do governo mudou de layout.**
 Vá em **Logs → Arquivos de depuração**, baixe o **print (.png)** e o **HTML (.html)**
@@ -231,9 +240,12 @@ sistema_cnd/
 │   ├── registro.py      liga cada tipo de certidão ao seu módulo
 │   ├── federal_rfb.py   Receita Federal / PGFN
 │   ├── cndt_tst.py      CNDT / TST
+│   ├── ocr_cndt.py      leitor do captcha do TST (funciona offline)
+│   ├── captcha.py       serviços pagos de captcha (opcional, desligado)
 │   ├── fgts_caixa.py    CRF / Caixa
 │   ├── sefaz_go.py      SEFAZ Goiás
 │   └── municipal_XXX.py prefeitura a definir
+├── dados/               o que o sistema aprende sozinho (modelos de captcha)
 ├── certidoes/           PDFs: {CNPJ}/{AAAA-MM}/{TIPO}_{AAAAMMDD}.pdf
 └── logs/
     ├── sistema.log
@@ -257,12 +269,29 @@ consertar um site nunca quebre os outros.
 | Etapa | Situação |
 |---|---|
 | 1. Estrutura, banco, modelos, interface | ✅ pronta |
-| 2. Robô CNDT (TST) | ⏳ próxima |
-| 3. Robô SEFAZ-GO | ⏳ |
+| 2. Robô CNDT (TST) | ✅ escrito e testado offline — falta a primeira emissão de verdade na sua máquina |
+| 3. Robô SEFAZ-GO | ⏳ próxima |
 | 4. Robô FGTS (Caixa) | ⏳ |
 | 5. Robô Federal (RFB/PGFN) | ⏳ |
 | 6. Agendador e alertas | 🟡 rotina diária já funciona; ajustes finos pendentes |
 | 7. Empacotamento, .bat e README | 🟡 já utilizável; revisão final na última etapa |
+
+### Sobre o robô do CNDT
+
+O levantamento inicial dizia que o site do TST pedia "só CNPJ + verificação de
+segurança". Na prática essa verificação **é um captcha**. Foi preciso resolvê-lo
+para a certidão sair — e isso está feito, sem custo nenhum.
+
+O robô não abre navegador: o site é um formulário antigo e todo o fluxo cabe em
+quatro requisições HTTP. Isso o deixa mais rápido, mais estável e **muito mais
+leve para o servidor do TST** (um navegador dispararia mais de dez requisições
+por emissão, o que atrai bloqueio de IP).
+
+O leitor de captcha foi medido com validação cruzada: **92% de acerto por
+caractere** em imagens que ele nunca tinha visto. Como o robô tenta até 4
+captchas diferentes por certidão, isso dá cerca de **97% de chance de emitir**.
+Quando não consegue, registra "Captcha não resolvido" e você anexa o PDF à mão —
+o controle de validade continua correto de qualquer jeito.
 
 Enquanto um robô não estiver pronto, ele registra "ainda não implementado" no
 histórico e **não atrapalha os demais** — é exatamente assim que o sistema se

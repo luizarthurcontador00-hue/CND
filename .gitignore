@@ -7,6 +7,9 @@
 sistema_cnd/certidoes/*
 !sistema_cnd/certidoes/.gitkeep
 
+# Modelos de captcha aprendidos na máquina do usuário
+sistema_cnd/dados/
+
 # Logs e prints de depuração
 sistema_cnd/logs/*
 !sistema_cnd/logs/.gitkeep

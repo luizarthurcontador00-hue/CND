@@ -42,6 +42,12 @@ armazenamento:
   # Pasta de logs e dos prints de tela de depuração (logs/debug).
   pasta_logs: "logs"
 
+  # Pasta onde o sistema guarda o que aprende sozinho — hoje, os modelos de
+  # leitura do captcha do TST, que melhoram a cada emissão bem-sucedida.
+  # Vale a pena incluir no backup, mas não é crítico: se sumir, o sistema
+  # recomeça com os modelos de fábrica.
+  pasta_dados: "dados"
+
   # Arquivo do banco de dados (um arquivo só, sem instalar nada).
   # FAÇA CÓPIA DESTE ARQUIVO DE VEZ EM QUANDO — é aqui que fica todo o cadastro.
   banco_dados: "banco.db"
@@ -77,8 +83,13 @@ navegador:
 # -----------------------------------------------------------------------------
 # 4) CAPTCHA — aquele "prove que você não é um robô"
 # -----------------------------------------------------------------------------
-# A Receita Federal e a Caixa (FGTS) usam captcha. Sem um serviço pago que
-# resolva isso, essas duas certidões NÃO saem sozinhas.
+# Três sites usam captcha: Receita Federal, Caixa (FGTS) e TST (CNDT).
+#
+# O do TST o sistema JÁ RESOLVE SOZINHO, de graça: é um captcha simples de 6
+# letras, lido na própria máquina (robos/ocr_cndt.py). Não precisa fazer nada.
+#
+# Os da Receita e da Caixa são bem mais difíceis (hCaptcha e similar). Sem um
+# serviço pago que resolva, essas duas certidões NÃO saem sozinhas.
 #
 # O sistema NUNCA para por causa disso: quando não consegue resolver o captcha,
 # ele grava a tentativa com o status CAPTCHA_FALHOU e você emite manualmente
@@ -176,7 +187,15 @@ certidoes:
     ativo: true
     validade_padrao_dias: 180
     janela_renovacao_dias: 30
-    tem_captcha: false
+    # ATENÇÃO: o site do TST TEM captcha (o levantamento inicial dizia que não).
+    # A diferença é que este o sistema resolve sozinho, sem serviço pago: é um
+    # captcha simples de 6 letras, lido pelo módulo robos/ocr_cndt.py.
+    tem_captcha: true
+    # Quantos captchas diferentes tentar antes de desistir de uma certidão.
+    # Cada tentativa pega uma imagem nova. Errar um não significa errar o
+    # próximo, então algumas tentativas elevam muito a taxa de sucesso.
+    # Aumente para 6 se estiver falhando demais; passar disso incomoda o site.
+    tentativas_captcha: 4
 
   FGTS:
     nome: "FGTS — CRF / Caixa Econômica"
