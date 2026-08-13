@@ -210,6 +210,31 @@ def _achar_botao(pagina, pistas):
     return candidatos[0][1] if candidatos else None
 
 
+def _fechar_popup_se_houver(pagina) -> None:
+    """Selecionar o contribuinte na lista abre um popup de detalhes ("Débitos")
+    por cima da tela — visto numa emissão real que travou. O popup do
+    Bootstrap/AngularJS cobre a TELA INTEIRA (não só a caixa branca visível),
+    então o botão "Imprimir certidão" de baixo, mesmo continuando "visível"
+    tecnicamente, fica impossível de clicar enquanto ele não for fechado —
+    o clique trava esperando o popup sair da frente (60s de timeout).
+
+    O botão de fechar é o "X" no canto do popup (ng-click="fechar()",
+    aria-label="Fechar popup" no ícone de dentro).
+    """
+    try:
+        fechar = pagina.query_selector(
+            '[role="dialog"] [aria-label="Fechar popup" i], '
+            '[role="dialog"] [aria-label*="fechar" i], '
+            '[role="dialog"] button.close'
+        )
+        if fechar and _visivel(fechar):
+            fechar.click()
+            pagina.wait_for_selector('[role="dialog"]', state="hidden", timeout=5000)
+            logger.info("[MUNICIPAL] Fechei o popup de detalhes que abriu ao selecionar o contribuinte.")
+    except Exception as e:
+        logger.debug("Não havia popup para fechar (ou não consegui fechar): %s", e)
+
+
 def _selecionar_primeira_linha(pagina) -> bool:
     """O sistema exige um contribuinte selecionado antes de imprimir.
 
@@ -349,6 +374,9 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
         # ------------------------------------ 3) selecionar o contribuinte
         # O sistema recusa a impressão sem um registro selecionado na lista.
         _selecionar_primeira_linha(pagina)
+        # Selecionar a linha abre um popup de detalhes por cima da tela —
+        # fecha antes de seguir, senão o clique em "Imprimir certidão" trava.
+        _fechar_popup_se_houver(pagina)
 
         # -------------------------------------------------- 4) imprimir
         imprimir = _achar_botao(pagina, PISTAS_BOTAO_IMPRIMIR)

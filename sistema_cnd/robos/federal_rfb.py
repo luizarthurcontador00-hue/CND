@@ -34,16 +34,39 @@ O QUE FOI DESCOBERTO SOBRE O SITE (agosto/2026)
 
 REGRA ESPECIAL DA 2ª VIA (a mais importante deste robô)
 -------------------------------------------------------
-Quando a empresa tem "positiva com efeitos de negativa", o portal NÃO emite uma
-certidão nova. O próprio portal diz, em texto:
+CORREÇÃO (visto numa emissão real, agosto/2026): o texto abaixo, que eu tinha
+lido do próprio JavaScript do portal e usava como sinal de "precisa da 2ª
+via", é na verdade um AVISO FIXO da tela — ele aparece mesmo no formulário em
+branco, antes de qualquer CNPJ ser digitado, só explicando pra que servem os
+dois botões:
 
     "Emita novas certidões ou consulte certidões emitidas a partir de
-     22/01/2018 e emita 2ª via."
+     01/09/2005 e emita 2ª via."
 
-Ou seja: a saída é a rota /consultar. Por isso, quando a emissão nova é
-recusada, este robô NÃO devolve erro na hora — ele tenta primeiro recuperar a
-2ª via de uma certidão anterior que ainda esteja válida (os dados vêm em
-contexto["emissao_anterior"]). Só desiste se isso também falhar.
+Usar esse texto como sinal fazia o robô desistir da emissão SEMPRE, mesmo sem
+nenhuma certidão anterior — nunca chegava a tentar baixar o PDF de verdade.
+
+O sinal de verdade, confirmado numa tela real, é um POPUP (não texto solto na
+página) chamado "Certidão Válida Encontrada", que só aparece quando já existe
+uma certidão vigente para aquele CNPJ:
+
+    "Já existe uma certidão válida para o CNPJ 30.734.055/0001-96."
+
+com dois botões dentro do próprio popup: "Consultar Certidão" (busca a mesma
+certidão já emitida) e "Emitir Nova Certidão" (força uma nova). O robô agora
+clica em "Consultar Certidão" DENTRO do popup para trazer o PDF já existente.
+Como o popup fica por cima da tela, e o botão de fundo (cinza, também escrito
+"Consultar Certidão") continua "visível" tecnicamente mesmo coberto, a busca
+do botão é restrita ao próprio popup — senão o clique tenta acertar o botão
+errado, coberto pelo popup, e trava (o mesmo tipo de bug que apareceu no robô
+Municipal com o modal de débitos).
+
+Se o popup não aparecer e mesmo assim a emissão não devolver PDF, o robô cai
+no caminho antigo: tenta a rota /consultar separada, recuperando a 2ª via de
+uma certidão anterior que ainda esteja válida (os dados vêm em
+contexto["emissao_anterior"]). Essa rota nunca foi confirmada numa tela real —
+se ela também falhar, mande os arquivos de Logs para eu confirmar o endereço
+certo.
 
 OUTRAS REGRAS
 -------------
@@ -142,14 +165,22 @@ PISTAS_BOTAO_EMITIR = ("emitir certidao", "emitir certidão", "emitir")
 PISTAS_BOTAO_CONSULTAR_2VIA = ("consultar certidao", "consultar certidão")
 PISTAS_BOTAO_PDF = ("pdf", "imprimir", "baixar", "salvar", "download", "2ª via", "2a via", "segunda via")
 
-#: Frases do portal que indicam que a emissão nova foi recusada e o caminho é
-#: a segunda via de uma certidão anterior.
+#: Título/corpo do popup "Certidão Válida Encontrada" — visto numa emissão
+#: real. É o sinal de verdade de que já existe certidão vigente para o CNPJ.
+#: ATENÇÃO — "consulte certidoes emitidas" e "emita 2a via" foram REMOVIDOS
+#: desta lista: são um aviso fixo do formulário, presente mesmo em branco
+#: (confirmado numa tela real), e faziam o robô desistir da emissão sempre.
+PISTAS_MODAL_CERTIDAO_EXISTENTE = (
+    "certidao valida encontrada",
+    "ja existe uma certidao valida",
+)
+
+#: Frases de reserva para quando NEM o popup aparece, nem o PDF vem — sinal
+#: mais fraco, nunca confirmado numa tela real (lido do JavaScript do
+#: portal). Mantidas só como último recurso antes de desistir.
 PISTAS_USE_SEGUNDA_VIA = (
     "ja possui certidao",
     "já possui certidão",
-    "consulte certidoes emitidas",
-    "emita 2a via",
-    "emita 2ª via",
     "segunda via",
     "certidao vigente",
     "certidão vigente",
@@ -225,8 +256,16 @@ def _visivel(elemento) -> bool:
         return False
 
 
-def _achar_botao(pagina, pistas):
-    for elemento in pagina.query_selector_all("button, input[type=submit], a"):
+def _achar_botao(pagina, pistas, escopo=None):
+    """Botão cujo texto bate com alguma das pistas.
+
+    `escopo`, quando informado (a página inteira, por padrão), restringe a
+    busca a dentro de um elemento — importante quando um popup está aberto:
+    o botão de mesmo nome na tela de trás continua "visível" tecnicamente
+    mesmo coberto, e clicar nele trava esperando o popup sair da frente.
+    """
+    alvo = escopo if escopo is not None else pagina
+    for elemento in alvo.query_selector_all("button, input[type=submit], a"):
         if not _visivel(elemento):
             continue
         try:
@@ -241,6 +280,25 @@ def _achar_botao(pagina, pistas):
             continue
         if any(pista in rotulo for pista in pistas):
             return elemento
+    return None
+
+
+def _modal_certidao_existente(pagina):
+    """Devolve o elemento do popup "Certidão Válida Encontrada", ou None.
+
+    Usa query_selector (não espera o elemento aparecer) — na maioria das
+    consultas ele nunca aparece, e esperar por ele deixaria toda emissão sem
+    certidão anterior mais lenta à toa.
+    """
+    try:
+        dialogo = pagina.query_selector('[role="dialog"]')
+        if not dialogo or not _visivel(dialogo):
+            return None
+        texto = normalizar(dialogo.inner_text())
+    except Exception:
+        return None
+    if any(pista in texto for pista in PISTAS_MODAL_CERTIDAO_EXISTENTE):
+        return dialogo
     return None
 
 
@@ -637,10 +695,37 @@ def _tentar_emitir(pagina, numero, contexto, regras, pasta_debug, url_emitir):
 
     pagina.wait_for_load_state("networkidle")
 
+    # O portal recusa emitir de novo quando já existe uma certidão válida, e
+    # avisa com um POPUP (não texto solto na página) oferecendo "Consultar
+    # Certidão" (a mesma já emitida). Busca do botão restrita ao popup — o
+    # botão de mesmo nome na tela de trás continua "visível" tecnicamente
+    # mesmo coberto por ele.
+    popup = _modal_certidao_existente(pagina)
+    if popup is not None:
+        logger.info("[FEDERAL] Já existe certidão válida — buscando pelo popup.")
+        botao_consultar = _achar_botao(pagina, PISTAS_BOTAO_CONSULTAR_2VIA, escopo=popup)
+        if botao_consultar is not None:
+            botao_consultar.click()
+            if _aguardar_desafio_ou_resultado(pagina) and not _responder_hcaptcha(pagina, contexto):
+                html, print_tela = capturar_estado(pagina)
+                return captcha_falhou(
+                    _mensagem_captcha(contexto),
+                    salvar_debug(pasta_debug, TIPO, numero, html=html, screenshot=print_tela),
+                )
+            pagina.wait_for_load_state("networkidle")
+            conteudo = _baixar_pdf(pagina)
+            if parece_pdf(conteudo):
+                texto_pagina = pagina.inner_text("body")
+                resultado = _montar_resultado(conteudo, numero, contexto, regras, texto_pagina)
+                resultado.detalhes["origem"] = "certidao_existente"
+                return resultado
+        # Não consegui pelo popup — cai no caminho de reserva (rota /consultar).
+        return None
+
     texto_pagina = pagina.inner_text("body")
     t = normalizar(texto_pagina)
 
-    # O portal recusou a emissão nova: o caminho passa a ser a 2ª via.
+    # Sinal mais fraco de reserva, nunca confirmado numa tela real.
     if any(pista in t for pista in PISTAS_USE_SEGUNDA_VIA):
         return None
 

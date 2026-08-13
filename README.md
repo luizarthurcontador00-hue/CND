@@ -338,7 +338,7 @@ consertar um site nunca quebre os outros.
 | 2. Robô CNDT (TST) | 🟡 protocolo confirmado; a leitura do captcha ainda falha às vezes |
 | 3. Robô SEFAZ-GO | ✅ **pronto e emitindo de verdade** |
 | 4. Robô FGTS (Caixa) | 🟡 escrito — depende de rodar na sua máquina (veja abaixo) |
-| 5. Robô Federal (RFB/PGFN) | 🟡 endereço, campo e botão corrigidos; modo assistido para o captcha |
+| 5. Robô Federal (RFB/PGFN) | 🟡 corrigido o bug que fazia desistir sempre da emissão; falta confirmar numa nova emissão real |
 | 5b. Robô Municipal (Caldas Novas) | ✅ testado contra a tela real da prefeitura |
 | 6. Agendador e alertas | 🟡 próxima — rotina diária já funciona; faltam os ajustes finos |
 | 7. Empacotamento, .bat e README | 🟡 já utilizável; revisão final na última etapa |
@@ -376,6 +376,14 @@ como a Prodata monta a tela em Angular, e não no robô em si:
    o tipo de consulta e outra sobre o tipo de certidão usam `"2"` para coisas
    diferentes). Se o robô confiasse só nesse valor, podia marcar a opção
    errada sem avisar. Agora ele usa o rótulo "CND", que é único na tela.
+
+**Corrigido (numa emissão real que travou 60 segundos): selecionar o
+contribuinte na lista abre um popup "Débitos" por cima da tela inteira.** O
+botão "Imprimir certidão", que fica embaixo, continua "visível" tecnicamente,
+mas o clique nele ficava esperando pra sempre o popup sair da frente — porque
+o popup cobre a tela toda, não só a caixinha branca que aparece nele. Agora o
+robô fecha esse popup (o "X" no canto) antes de seguir para o "Imprimir
+certidão".
 
 ### Se a trabalhista (CNDT) falhar no captcha
 
@@ -426,17 +434,36 @@ primeira é a recomendada porque não custa nada:
    `captcha.chave_api` no `config.yaml` e o robô emite sem você. Custa poucos
    centavos por certidão.
 
-**A regra da 2ª via está implementada.** Quando a empresa tem "positiva com
-efeitos de negativa", o portal não emite certidão nova. Lendo o próprio código
-do portal, encontrei a saída que ele oferece:
+**Corrigido um erro sério (numa emissão real, agosto/2026): o robô estava
+desistindo da emissão SEMPRE, em toda consulta.** A regra da 2ª via original
+usava este texto como sinal de "o portal recusou, precisa buscar uma
+certidão anterior":
 
-> "Emita novas certidões ou consulte certidões emitidas a partir de 22/01/2018
-> e emita 2ª via."
+> "Emita novas certidões ou consulte certidões emitidas a partir de
+> 01/09/2005 e emita 2ª via."
 
-Então, quando a emissão nova é recusada, o robô **não devolve erro na hora** —
-ele vai à tela de consulta e tenta recuperar a 2ª via de uma certidão anterior
-ainda válida. Só desiste se isso também falhar, e nesse caso explica exatamente
-o que aconteceu.
+O problema: esse texto é um **aviso fixo da tela**, que aparece mesmo no
+formulário em branco, antes de qualquer CNPJ ser digitado — só explica pra que
+servem os dois botões "Emitir Certidão" e "Consultar Certidão". Eu tinha
+tirado esse texto do próprio JavaScript do portal, sem confirmar numa tela
+real, e ele não é uma resposta condicional coisa nenhuma. Resultado: o robô
+clicava em "Emitir Certidão" certinho, mas aí lia esse aviso permanente e
+desistia na hora, sem nunca chegar a baixar um PDF de verdade.
+
+**O sinal certo, que só aparece quando realmente já existe uma certidão
+válida**, é um **popup** chamado "Certidão Válida Encontrada":
+
+> "Já existe uma certidão válida para o CNPJ 30.734.055/0001-96."
+
+com dois botões dentro dele: "Consultar Certidão" (busca a mesma já emitida)
+e "Emitir Nova Certidão". O robô agora reconhece esse popup específico e
+clica em "Consultar Certidão" — mas só o de **dentro do popup**: o botão de
+mesmo nome na tela de trás continua "visível" tecnicamente mesmo coberto, e
+clicar nele travaria do mesmo jeito que travou no robô Municipal com o popup
+de débitos (veja a seção do Municipal acima). Se o popup não aparecer e mesmo
+assim não vier PDF nenhum, o robô ainda cai no caminho de reserva (a rota
+`/consultar` separada) — esse caminho nunca foi confirmado numa tela real, e
+se falhar também, me manda os arquivos de Logs.
 
 **Filiais:** a certidão é emitida pelo CNPJ da matriz e vale para as filiais. O
 sistema converte sozinho o CNPJ da filial no da matriz — **recalculando os dois
