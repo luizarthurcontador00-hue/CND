@@ -206,6 +206,13 @@ certidoes:
     # número achando que vai renovar mais cedo — vai só gerar erro.
     janela_renovacao_dias: 10
     tem_captcha: true
+    # O site da Caixa fica atrás de um serviço anti-robô (ShieldSquare) que às
+    # vezes exige um "não sou um robô". Quando isso acontecer com o navegador
+    # VISÍVEL (navegador.headless: false), o robô espera este tanto de segundos
+    # para você resolver o desafio na tela. Depois de resolvido uma vez, a
+    # sessão liberada fica guardada em dados/sessao_fgts.json e é reaproveitada
+    # nas próximas emissões.
+    segundos_para_resolver: 180
 
   ESTADUAL_GO:
     nome: "Estadual — SEFAZ Goiás"

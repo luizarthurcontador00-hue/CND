@@ -271,10 +271,45 @@ consertar um site nunca quebre os outros.
 | 1. Estrutura, banco, modelos, interface | ✅ pronta |
 | 2. Robô CNDT (TST) | ✅ escrito e testado offline — falta a primeira emissão de verdade na sua máquina |
 | 3. Robô SEFAZ-GO | ✅ **pronto e emitindo de verdade** |
-| 4. Robô FGTS (Caixa) | ⏳ próxima |
-| 5. Robô Federal (RFB/PGFN) | ⏳ |
+| 4. Robô FGTS (Caixa) | 🟡 escrito — depende de rodar na sua máquina (veja abaixo) |
+| 5. Robô Federal (RFB/PGFN) | ⏳ próxima |
 | 6. Agendador e alertas | 🟡 rotina diária já funciona; ajustes finos pendentes |
 | 7. Empacotamento, .bat e README | 🟡 já utilizável; revisão final na última etapa |
+
+### Sobre o robô do FGTS (leia antes de usar)
+
+O site da Caixa é o mais defendido dos quatro. Antes de qualquer captcha, o
+domínio inteiro fica atrás do **ShieldSquare/PerfDrive**, um serviço comercial
+anti-robô. Quando ele desconfia do visitante, desvia a navegação e exige um
+hCaptcha ("toque no quadro para verificar que você não é robô").
+
+Três consequências:
+
+1. **Este é o único robô que abre navegador de verdade.** A CNDT e a SEFAZ-GO
+   usam requisição direta, que é mais leve; aqui isso não funciona, porque o
+   ShieldSquare avalia a impressão digital do navegador.
+
+2. **O bloqueio depende muito da sua conexão.** Endereços de servidor/nuvem são
+   barrados quase sempre; a internet comum de um escritório costuma passar sem
+   nem ver o desafio. Por isso o comportamento na sua máquina tende a ser bem
+   melhor do que em qualquer teste feito fora dela.
+
+3. **Se o desafio aparecer, você resolve UMA vez.** Coloque
+   `navegador.headless: false` no `config.yaml`, rode a consulta do FGTS e
+   resolva o "não sou um robô" na janela que abrir. A sessão liberada fica
+   guardada em `dados/sessao_fgts.json` e é reaproveitada nas próximas
+   emissões — não precisa repetir a cada empresa.
+
+Se nada disso funcionar na sua rede, o sistema registra "Captcha não resolvido"
+com a explicação, e você emite o CRF à mão e anexa pela tela de Histórico. O
+controle de validade continua correto.
+
+**O que ainda preciso de você:** não consegui abrir o formulário do CRF durante
+o desenvolvimento (o endereço de rede usado era barrado), então não vi os nomes
+reais dos campos. Para não inventar, o robô **procura** os elementos pelo que
+eles são — um campo que fale em CNPJ, um botão escrito "Consultar". Isso deve
+funcionar, mas se falhar, os arquivos de depuração da tela **Logs** me mostram
+a página real e eu ajusto rápido.
 
 ### Sobre o robô da SEFAZ-GO
 

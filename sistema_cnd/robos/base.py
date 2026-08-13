@@ -492,8 +492,12 @@ class NavegadorIndisponivel(Exception):
     """Playwright não instalado ou navegador não baixado."""
 
 
-def abrir_navegador(contexto: dict):
+def abrir_navegador(contexto: dict, estado: Path | str | None = None):
     """Devolve (playwright, browser, page) já configurados pelo config.yaml.
+
+    `estado` é o arquivo de sessão (cookies) gravado por uma execução anterior.
+    Serve para não repetir a verificação anti-robô da Caixa a cada emissão:
+    resolve-se uma vez e as próximas aproveitam a sessão já liberada.
 
     Uso dentro de um robô:
 
@@ -526,12 +530,17 @@ def abrir_navegador(contexto: dict):
             "Não consegui abrir o navegador. Rode uma vez: python -m playwright install chromium"
         ) from e
 
-    contexto_navegador = navegador.new_context(
-        user_agent=opcoes.get("user_agent"),
-        accept_downloads=True,
-        viewport={"width": 1366, "height": 900},
-        locale="pt-BR",
-    )
+    argumentos_contexto = {
+        "user_agent": opcoes.get("user_agent"),
+        "accept_downloads": True,
+        "viewport": {"width": 1366, "height": 900},
+        "locale": "pt-BR",
+    }
+    if estado and Path(estado).exists():
+        argumentos_contexto["storage_state"] = str(estado)
+        logger.info("Reaproveitando a sessão guardada em %s", estado)
+
+    contexto_navegador = navegador.new_context(**argumentos_contexto)
     contexto_navegador.set_default_timeout(timeout_ms)
     pagina = contexto_navegador.new_page()
     return pw, navegador, pagina
