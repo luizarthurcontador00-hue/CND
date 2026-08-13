@@ -142,19 +142,36 @@ def formatar_cnpj(cnpj: str) -> str:
     return f"{c[:2]}.{c[2:5]}.{c[5:8]}/{c[8:12]}-{c[12:]}"
 
 
+def _digito_cnpj(base: str) -> int:
+    """Calcula um dígito verificador de CNPJ a partir dos dígitos anteriores."""
+    tamanho = len(base)
+    pesos = list(range(tamanho - 7, 1, -1)) + list(range(9, 1, -1))
+    soma = sum(int(d) * p for d, p in zip(base, pesos))
+    resto = soma % 11
+    return 0 if resto < 2 else 11 - resto
+
+
 def cnpj_valido(cnpj: str) -> bool:
     """Confere os dois dígitos verificadores."""
     c = limpar_cnpj(cnpj)
     if len(c) != 14 or c == c[0] * 14:
         return False
-    for tamanho in (12, 13):
-        pesos = list(range(tamanho - 7, 1, -1)) + list(range(9, 1, -1))
-        soma = sum(int(d) * p for d, p in zip(c[:tamanho], pesos))
-        resto = soma % 11
-        digito = 0 if resto < 2 else 11 - resto
-        if int(c[tamanho]) != digito:
-            return False
-    return True
+    return int(c[12]) == _digito_cnpj(c[:12]) and int(c[13]) == _digito_cnpj(c[:13])
+
+
+def cnpj_da_matriz(cnpj: str) -> str:
+    """CNPJ da matriz do mesmo grupo: mesma raiz, filial 0001.
+
+    ATENÇÃO — os dois últimos dígitos são verificadores e dependem dos doze
+    anteriores. Trocar só o número da filial (0002 -> 0001) e manter os dígitos
+    antigos produz um CNPJ INVÁLIDO, que os sites do governo recusam. Por isso
+    os verificadores são recalculados aqui.
+    """
+    c = limpar_cnpj(cnpj)
+    if len(c) != 14:
+        return c
+    base = c[:8] + "0001"
+    return base + str(_digito_cnpj(base)) + str(_digito_cnpj(base + str(_digito_cnpj(base))))
 
 
 # =============================================================================

@@ -153,10 +153,14 @@ class Empresa(Base):
 
     @property
     def cnpj_matriz(self) -> str:
-        """CNPJ da matriz do mesmo grupo (a Federal é emitida pela matriz)."""
-        if len(self.cnpj) != 14:
-            return self.cnpj
-        return self.cnpj[:8] + "0001" + self.cnpj[12:]
+        """CNPJ da matriz do mesmo grupo (a Federal é emitida pela matriz).
+
+        Os dígitos verificadores são recalculados: aproveitar os da filial
+        geraria um CNPJ inválido, recusado pelos sites do governo.
+        """
+        from robos.base import cnpj_da_matriz
+
+        return cnpj_da_matriz(self.cnpj)
 
     @property
     def apelido(self) -> str:

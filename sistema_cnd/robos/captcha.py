@@ -48,6 +48,101 @@ def resolver_por_servico(imagem: bytes, config) -> str | None:
     return None
 
 
+def resolver_hcaptcha(sitekey: str, url_pagina: str, config) -> str | None:
+    """Resolve um hCaptcha (o "não sou um robô" da Receita e da Caixa).
+
+    Diferente do captcha de imagem, aqui o serviço devolve um TOKEN que precisa
+    ser colocado no campo escondido da página. Só funciona com serviço pago:
+    não existe jeito de resolver hCaptcha localmente.
+    """
+    provedor = str(config.captcha.get("provedor", "nenhum")).lower().strip()
+    chave = str(config.captcha.get("chave_api", "")).strip()
+    limite = int(config.captcha.get("timeout_segundos", 180))
+
+    if provedor in ("", "nenhum") or not chave:
+        return None
+
+    try:
+        if provedor == "2captcha":
+            return _dois_captcha_hcaptcha(sitekey, url_pagina, chave, limite)
+        if provedor == "anticaptcha":
+            return _anti_captcha_hcaptcha(sitekey, url_pagina, chave, limite)
+    except Exception as e:
+        logger.warning("O serviço de captcha (%s) falhou no hCaptcha: %s", provedor, e)
+    return None
+
+
+def _dois_captcha_hcaptcha(sitekey: str, url_pagina: str, chave: str, limite: int) -> str | None:
+    with httpx.Client(timeout=40) as c:
+        envio = c.post(
+            "https://2captcha.com/in.php",
+            data={
+                "key": chave,
+                "method": "hcaptcha",
+                "sitekey": sitekey,
+                "pageurl": url_pagina,
+                "json": 1,
+            },
+        ).json()
+
+        if envio.get("status") != 1:
+            logger.warning("2Captcha recusou o hCaptcha: %s", envio.get("request"))
+            return None
+
+        identificador = envio["request"]
+        fim = time.time() + limite
+        while time.time() < fim:
+            time.sleep(ESPERA_ENTRE_CONSULTAS)
+            r = c.get(
+                "https://2captcha.com/res.php",
+                params={"key": chave, "action": "get", "id": identificador, "json": 1},
+            ).json()
+            if r.get("status") == 1:
+                return str(r["request"]).strip()
+            if r.get("request") != "CAPCHA_NOT_READY":
+                logger.warning("2Captcha devolveu erro no hCaptcha: %s", r.get("request"))
+                return None
+
+    logger.warning("2Captcha não resolveu o hCaptcha dentro de %ss.", limite)
+    return None
+
+
+def _anti_captcha_hcaptcha(sitekey: str, url_pagina: str, chave: str, limite: int) -> str | None:
+    with httpx.Client(timeout=40) as c:
+        envio = c.post(
+            "https://api.anti-captcha.com/createTask",
+            json={
+                "clientKey": chave,
+                "task": {
+                    "type": "HCaptchaTaskProxyless",
+                    "websiteURL": url_pagina,
+                    "websiteKey": sitekey,
+                },
+            },
+        ).json()
+
+        if envio.get("errorId"):
+            logger.warning("Anti-Captcha recusou o hCaptcha: %s", envio.get("errorDescription"))
+            return None
+
+        tarefa = envio["taskId"]
+        fim = time.time() + limite
+        while time.time() < fim:
+            time.sleep(ESPERA_ENTRE_CONSULTAS)
+            r = c.post(
+                "https://api.anti-captcha.com/getTaskResult",
+                json={"clientKey": chave, "taskId": tarefa},
+            ).json()
+            if r.get("errorId"):
+                logger.warning("Anti-Captcha erro no hCaptcha: %s", r.get("errorDescription"))
+                return None
+            if r.get("status") == "ready":
+                return str(r["solution"]["gRecaptchaResponse"]).strip()
+
+    logger.warning("Anti-Captcha não resolveu o hCaptcha dentro de %ss.", limite)
+    return None
+
+
 def _dois_captcha(imagem: bytes, chave: str, limite: int) -> str | None:
     with httpx.Client(timeout=40) as c:
         envio = c.post(

@@ -242,6 +242,7 @@ sistema_cnd/
 │   ├── cndt_tst.py      CNDT / TST
 │   ├── ocr_cndt.py      leitor do captcha do TST (funciona offline)
 │   ├── captcha.py       serviços pagos de captcha (opcional, desligado)
+│   │                    — resolve captcha de imagem e hCaptcha
 │   ├── fgts_caixa.py    CRF / Caixa
 │   ├── sefaz_go.py      SEFAZ Goiás
 │   └── municipal_XXX.py prefeitura a definir
@@ -272,9 +273,43 @@ consertar um site nunca quebre os outros.
 | 2. Robô CNDT (TST) | ✅ escrito e testado offline — falta a primeira emissão de verdade na sua máquina |
 | 3. Robô SEFAZ-GO | ✅ **pronto e emitindo de verdade** |
 | 4. Robô FGTS (Caixa) | 🟡 escrito — depende de rodar na sua máquina (veja abaixo) |
-| 5. Robô Federal (RFB/PGFN) | ⏳ próxima |
-| 6. Agendador e alertas | 🟡 rotina diária já funciona; ajustes finos pendentes |
+| 5. Robô Federal (RFB/PGFN) | 🟡 escrito — exige hCaptcha (veja abaixo) |
+| 6. Agendador e alertas | 🟡 próxima — rotina diária já funciona; faltam os ajustes finos |
 | 7. Empacotamento, .bat e README | 🟡 já utilizável; revisão final na última etapa |
+
+### Sobre o robô da Federal (RFB/PGFN)
+
+**Os dois endereços do levantamento saíram do ar (404).** A Receita migrou o
+serviço para um portal novo, em `servicos.receitafederal.gov.br/servico/certidoes`,
+que é uma aplicação JavaScript moderna — por isso este robô também abre
+navegador de verdade.
+
+**O portal usa hCaptcha**, o mesmo tipo da Caixa. Não existe jeito de resolver
+isso na própria máquina. Você tem duas saídas, e a primeira é a recomendada:
+
+1. **Emitir à mão e anexar** (sem custo). Emita a certidão no portal e anexe o
+   PDF em Histórico → "Anexar PDF emitido à mão". Como a Federal vale 180 dias,
+   isso dá umas duas vezes por ano por empresa.
+2. **Contratar um serviço de captcha.** Preencha `captcha.provedor` e
+   `captcha.chave_api` no `config.yaml` e o robô passa a emitir sozinho.
+   Custa poucos centavos por certidão.
+
+**A regra da 2ª via está implementada.** Quando a empresa tem "positiva com
+efeitos de negativa", o portal não emite certidão nova. Lendo o próprio código
+do portal, encontrei a saída que ele oferece:
+
+> "Emita novas certidões ou consulte certidões emitidas a partir de 22/01/2018
+> e emita 2ª via."
+
+Então, quando a emissão nova é recusada, o robô **não devolve erro na hora** —
+ele vai à tela de consulta e tenta recuperar a 2ª via de uma certidão anterior
+ainda válida. Só desiste se isso também falhar, e nesse caso explica exatamente
+o que aconteceu.
+
+**Filiais:** a certidão é emitida pelo CNPJ da matriz e vale para as filiais. O
+sistema converte sozinho o CNPJ da filial no da matriz — **recalculando os dois
+dígitos verificadores**, que mudam junto. (Aproveitar os dígitos da filial
+geraria um CNPJ inválido; foi um erro que o teste pegou antes de virar problema.)
 
 ### Sobre o robô do FGTS (leia antes de usar)
 
