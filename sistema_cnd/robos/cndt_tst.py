@@ -201,6 +201,8 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
 
     ultimo_motivo = "não foi possível emitir"
     ultimo_html = None
+    guardar_falhas = regras.get("guardar_captchas_que_falharam", True)
+    captchas_nao_lidos: list[bytes] = []
 
     try:
         with httpx.Client(
@@ -231,6 +233,11 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
                     texto,
                     origem,
                 )
+                # Guarda a imagem de toda tentativa. Se a certidão sair, a
+                # lista é descartada; se não sair, é porque TODAS falharam —
+                # inclusive as que o sistema achou que tinha lido certo, que
+                # são justamente as mais úteis para corrigir a leitura.
+                captchas_nao_lidos.append(imagem)
 
                 envio = cliente.post(
                     URL_EMISSAO,
@@ -304,17 +311,58 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
         )
 
     debug = salvar_debug(pasta_debug, TIPO, numero, html=ultimo_html)
+    if guardar_falhas and captchas_nao_lidos:
+        guardados = _guardar_captchas(pasta_debug, numero, captchas_nao_lidos)
+        if guardados:
+            logger.info(
+                "[CNDT] Guardei %d imagem(ns) de captcha em logs/debug. "
+                "Mande esses arquivos para eu ensinar o sistema a lê-los.",
+                guardados,
+            )
 
     if "captcha" in normalizar(ultimo_motivo) or "verificacao" in normalizar(ultimo_motivo):
         return captcha_falhou(
-            f"Não consegui passar pelo captcha do TST em {tentativas_captcha} tentativas "
-            f"({ultimo_motivo}). Emita a certidão à mão e anexe o PDF pela tela de Histórico.",
+            f"Não consegui ler o captcha do TST em {tentativas_captcha} tentativas. "
+            "As imagens que não consegui ler ficaram guardadas em logs/debug "
+            "(arquivos que começam com 'captcha_') — me mande esses arquivos que eu "
+            "ensino o sistema a ler essas letras, e a partir daí ele acerta sozinho. "
+            "Enquanto isso, emita a certidão à mão e anexe o PDF pela tela de Histórico.",
             debug,
         )
     return erro(
         f"Não consegui emitir a CNDT em {tentativas_captcha} tentativas: {ultimo_motivo}",
         debug,
     )
+
+
+def _guardar_captchas(pasta_debug, cnpj: str, imagens: list[bytes]) -> int:
+    """Guarda as imagens de captcha que o sistema não conseguiu ler.
+
+    É o que permite melhorar a leitura: com os arquivos em mãos, dá para
+    acrescentar à biblioteca justamente as letras que estão dando trabalho.
+    """
+    if not pasta_debug:
+        return 0
+
+    from datetime import datetime
+    from pathlib import Path as _Path
+
+    pasta = _Path(pasta_debug)
+    try:
+        pasta.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        return 0
+
+    carimbo = datetime.now().strftime("%Y%m%d_%H%M%S")
+    gravados = 0
+    for i, imagem in enumerate(imagens, start=1):
+        destino = pasta / f"captcha_{carimbo}_{limpar_cnpj(cnpj)}_{i}.png"
+        try:
+            destino.write_bytes(imagem)
+            gravados += 1
+        except OSError:
+            break
+    return gravados
 
 
 def _motivo_da_recusa(texto_visivel: str) -> str:

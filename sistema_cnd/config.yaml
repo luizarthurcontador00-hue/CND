@@ -182,6 +182,15 @@ certidoes:
     tem_captcha: true
     usa_cnpj_matriz: true    # emitida pelo CNPJ da matriz, vale para as filiais
 
+    # Endereços do portal da Receita.
+    # ATENÇÃO ao "#" no meio: ele faz parte do endereço, não é enfeite.
+    # Se um dia o portal mudar de lugar de novo, abra o site no navegador,
+    # copie o endereço da barra e cole aqui — não precisa esperar por mim.
+    url_emitir: "https://servicos.receitafederal.gov.br/servico/certidoes/#/home/cnpj"
+    # Tela usada para tirar a 2ª via quando o portal se recusa a emitir uma
+    # certidão nova (caso da "positiva com efeitos de negativa").
+    url_consultar: "https://servicos.receitafederal.gov.br/servico/certidoes/#/consultar"
+
   CNDT:
     nome: "Trabalhista — CNDT / TST"
     ativo: true
@@ -192,10 +201,16 @@ certidoes:
     # captcha simples de 6 letras, lido pelo módulo robos/ocr_cndt.py.
     tem_captcha: true
     # Quantos captchas diferentes tentar antes de desistir de uma certidão.
-    # Cada tentativa pega uma imagem nova. Errar um não significa errar o
-    # próximo, então algumas tentativas elevam muito a taxa de sucesso.
-    # Aumente para 6 se estiver falhando demais; passar disso incomoda o site.
-    tentativas_captcha: 4
+    # Cada tentativa pega uma imagem nova, e errar um não influencia o próximo.
+    # Como o sistema aprende com os acertos, este número tende a importar cada
+    # vez menos com o tempo. Pode subir até 12 sem incomodar o site (há uma
+    # espera entre as tentativas).
+    tentativas_captcha: 8
+
+    # Guardar em logs/debug a imagem dos captchas que o sistema NÃO conseguiu
+    # ler? Serve para você me mandar e eu ensinar o sistema a ler aquelas
+    # letras. Ocupa pouquíssimo espaço (cada imagem tem ~5 KB).
+    guardar_captchas_que_falharam: true
 
   FGTS:
     nome: "FGTS — CRF / Caixa Econômica"

@@ -330,19 +330,46 @@ consertar um site nunca quebre os outros.
 | Etapa | Situação |
 |---|---|
 | 1. Estrutura, banco, modelos, interface | ✅ pronta |
-| 2. Robô CNDT (TST) | ✅ escrito e testado offline — falta a primeira emissão de verdade na sua máquina |
+| 2. Robô CNDT (TST) | 🟡 protocolo confirmado; a leitura do captcha ainda falha às vezes |
 | 3. Robô SEFAZ-GO | ✅ **pronto e emitindo de verdade** |
 | 4. Robô FGTS (Caixa) | 🟡 escrito — depende de rodar na sua máquina (veja abaixo) |
-| 5. Robô Federal (RFB/PGFN) | 🟡 escrito — exige hCaptcha (veja abaixo) |
+| 5. Robô Federal (RFB/PGFN) | 🟡 endereço corrigido (#/home/cnpj); exige hCaptcha |
 | 6. Agendador e alertas | 🟡 próxima — rotina diária já funciona; faltam os ajustes finos |
 | 7. Empacotamento, .bat e README | 🟡 já utilizável; revisão final na última etapa |
+
+### Se a trabalhista (CNDT) falhar no captcha
+
+O envio ao TST está correto — isso foi confirmado testando o protocolo direto
+com o site. O que às vezes falha é a **leitura da imagem**: 16 das 36 letras e
+números possíveis nunca apareceram nas amostras que usei para ensinar o
+sistema, e nessas ele erra mais.
+
+Isso se resolve sozinho com o uso, e você pode acelerar:
+
+1. Quando uma CNDT falhar, abra a pasta `sistema_cnd/logs/debug/`.
+2. Pegue os arquivos que começam com **`captcha_`** (são as imagens que o
+   sistema não conseguiu ler) e **me mande**.
+3. Eu acrescento essas letras à biblioteca e o sistema passa a acertá-las.
+
+O sistema já tenta **8 captchas diferentes** por certidão antes de desistir, e
+guarda o que aprende a cada acerto — quanto mais roda, menos erra.
 
 ### Sobre o robô da Federal (RFB/PGFN)
 
 **Os dois endereços do levantamento saíram do ar (404).** A Receita migrou o
-serviço para um portal novo, em `servicos.receitafederal.gov.br/servico/certidoes`,
-que é uma aplicação JavaScript moderna — por isso este robô também abre
-navegador de verdade.
+serviço para um portal novo, que é uma aplicação JavaScript moderna — por isso
+este robô também abre navegador de verdade.
+
+O endereço correto tem um `#` no meio, e ele **faz parte do endereço**:
+
+```
+https://servicos.receitafederal.gov.br/servico/certidoes/#/home/cnpj
+```
+
+Sem o `#`, a página abre em branco. Os dois endereços que o robô usa (emissão e
+2ª via) ficam no `config.yaml`, em `certidoes.FEDERAL`: se o portal mudar de
+lugar outra vez, abra o site no navegador, copie o endereço da barra e cole
+lá — sem esperar por uma versão nova do sistema.
 
 **O portal usa hCaptcha**, o mesmo tipo da Caixa. Não existe jeito de resolver
 isso na própria máquina. Você tem duas saídas, e a primeira é a recomendada:

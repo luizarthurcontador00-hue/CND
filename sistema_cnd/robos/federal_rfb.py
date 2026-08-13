@@ -18,11 +18,19 @@ O QUE FOI DESCOBERTO SOBRE O SITE (agosto/2026)
    O sistema NUNCA trava por isso — registra CAPTCHA_FALHOU e você anexa o PDF
    pela tela de Histórico.
 
-4. AS ROTAS DA APLICAÇÃO, lidas do próprio pacote JavaScript do portal:
-     /servico/certidoes/emitir     -> emitir certidão nova
-     /servico/certidoes/consultar  -> consultar certidão já emitida e tirar 2ª via
-   O campo do documento se chama "niContribuinte" (placeholder "Informe o CNPJ")
-   e existe um seletor de tipo de contribuinte (CPF/CNPJ/CIB/CNO).
+4. AS ROTAS FICAM DEPOIS DO "#", e isso importa: sem o "#" a página abre em
+   branco. O endereço correto da tela de CNPJ é
+
+     https://servicos.receitafederal.gov.br/servico/certidoes/#/home/cnpj
+
+   Rotas do portal, lidas do próprio pacote JavaScript dele:
+     #/home/cnpj  #/home/cpf  #/home/cib  #/home/cno
+     #/emitir     #/consultar (2ª via)    #/resultado
+   O campo do documento se chama "niContribuinte" (placeholder "Informe o CNPJ").
+
+   Os dois endereços podem ser trocados no config.yaml (url_emitir e
+   url_consultar) sem mexer no código — portais de governo mudam de endereço
+   sem avisar, e isso já aconteceu duas vezes com este.
 
 REGRA ESPECIAL DA 2ª VIA (a mais importante deste robô)
 -------------------------------------------------------
@@ -78,8 +86,32 @@ logger = logging.getLogger(__name__)
 
 TIPO = "FEDERAL"
 BASE = "https://servicos.receitafederal.gov.br/servico/certidoes"
-URL_EMITIR = f"{BASE}/emitir"
-URL_CONSULTAR = f"{BASE}/consultar"
+
+#: Endereço da tela de emissão por CNPJ.
+#: O portal é uma aplicação Angular com rotas depois do "#" — o "#/home/cnpj"
+#: NÃO é enfeite, é o caminho de verdade. Sem ele a página abre em branco.
+#: Rotas existentes no portal, lidas do próprio código dele:
+#:   #/home/cnpj  #/home/cpf  #/home/cib  #/home/cno
+#:   #/emitir     #/consultar (2ª via)    #/resultado
+URL_EMITIR_PADRAO = f"{BASE}/#/home/cnpj"
+URL_CONSULTAR_PADRAO = f"{BASE}/#/consultar"
+
+# Mantidos para compatibilidade e para os testes.
+URL_EMITIR = URL_EMITIR_PADRAO
+URL_CONSULTAR = URL_CONSULTAR_PADRAO
+
+
+def _enderecos(regras: dict) -> tuple[str, str]:
+    """Endereços do portal, com o config.yaml tendo a última palavra.
+
+    Portais de governo trocam de endereço sem aviso. Deixar isso no
+    config.yaml permite consertar colando o novo endereço, sem mexer no código
+    nem esperar por uma versão nova do sistema.
+    """
+    return (
+        str(regras.get("url_emitir") or URL_EMITIR_PADRAO).strip(),
+        str(regras.get("url_consultar") or URL_CONSULTAR_PADRAO).strip(),
+    )
 
 #: Campo do documento no formulário Angular do portal.
 SELETOR_DOCUMENTO = (
@@ -108,6 +140,21 @@ PISTAS_USE_SEGUNDA_VIA = (
 # =============================================================================
 #  AUXILIARES
 # =============================================================================
+
+
+def _esperar_formulario(pagina, segundos: int = 30) -> bool:
+    """Espera o Angular desenhar o campo do documento.
+
+    Em aplicação Angular o HTML inicial vem praticamente vazio: os campos só
+    aparecem quando o JavaScript termina de montar a tela. Procurar o campo
+    antes disso encontra nada e faz o robô achar que o site mudou.
+    """
+    try:
+        pagina.wait_for_selector(SELETOR_DOCUMENTO, timeout=segundos * 1000)
+        return True
+    except Exception:
+        logger.info("[FEDERAL] O campo do documento não apareceu em %ds.", segundos)
+        return False
 
 
 def _visivel(elemento) -> bool:
@@ -259,6 +306,7 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
     pasta_debug = contexto.get("pasta_debug")
     regras = contexto.get("regras") or {}
     sessao = _arquivo_sessao(contexto)
+    url_emitir, url_consultar = _enderecos(regras)
 
     pw = navegador = pagina = None
     try:
@@ -270,7 +318,9 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
 
     try:
         # ------------------------------------------------- 1) emissão nova
-        resultado = _tentar_emitir(pagina, numero, contexto, regras, pasta_debug)
+        resultado = _tentar_emitir(
+            pagina, numero, contexto, regras, pasta_debug, url_emitir
+        )
         if resultado is not None:
             return resultado
 
@@ -281,7 +331,7 @@ def consultar(cnpj: str, contexto: dict) -> ResultadoConsulta:
             "certidão anterior ainda válida."
         )
         return _tentar_segunda_via(
-            pagina, numero, contexto, regras, pasta_debug, anterior
+            pagina, numero, contexto, regras, pasta_debug, anterior, url_consultar
         )
 
     except Exception as e:
@@ -330,9 +380,12 @@ def _preencher_documento(pagina, numero: str) -> bool:
     return True
 
 
-def _tentar_emitir(pagina, numero, contexto, regras, pasta_debug):
+def _tentar_emitir(pagina, numero, contexto, regras, pasta_debug, url_emitir):
     """Tenta a emissão nova. Devolve ResultadoConsulta, ou None para cair na 2ª via."""
-    pagina.goto(URL_EMITIR, wait_until="networkidle")
+    pagina.goto(url_emitir, wait_until="networkidle")
+    # Aplicação Angular: a tela só existe depois que o JavaScript monta a
+    # página. Esperar a rede parar não basta.
+    _esperar_formulario(pagina)
 
     if not _preencher_documento(pagina, numero):
         html, print_tela = capturar_estado(pagina)
@@ -376,9 +429,12 @@ def _tentar_emitir(pagina, numero, contexto, regras, pasta_debug):
     return _montar_resultado(conteudo, numero, contexto, regras, texto_pagina)
 
 
-def _tentar_segunda_via(pagina, numero, contexto, regras, pasta_debug, anterior):
+def _tentar_segunda_via(
+    pagina, numero, contexto, regras, pasta_debug, anterior, url_consultar
+):
     """Recupera a 2ª via de uma certidão anterior ainda válida."""
-    pagina.goto(URL_CONSULTAR, wait_until="networkidle")
+    pagina.goto(url_consultar, wait_until="networkidle")
+    _esperar_formulario(pagina)
 
     if not _preencher_documento(pagina, numero):
         html, print_tela = capturar_estado(pagina)
